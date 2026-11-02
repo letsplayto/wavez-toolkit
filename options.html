@@ -1,0 +1,111 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Wavez Toolkit options</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 14px system-ui, sans-serif; max-width: 600px; margin: 24px auto; }
+  h2 { margin: 26px 0 0; font-size: 15px; border-bottom: 1px solid rgba(128,128,128,.3); padding-bottom: 4px; }
+  label { display: block; margin-top: 14px; font-weight: 600; }
+  label.inline { display: flex; gap: 8px; align-items: center; font-weight: 400; margin-top: 8px; }
+  small { color: gray; font-weight: normal; display: block; }
+  textarea, input[type=number], input[type=text], select { width: 100%; padding: 6px; box-sizing: border-box; }
+  textarea { height: 120px; font-family: monospace; }
+  button { margin-top: 16px; margin-right: 8px; padding: 6px 14px; }
+  h3 { margin: 18px 0 0; font-size: 13px; }
+  .colors { display: flex; gap: 16px; }
+  .colors label { flex: 1; }
+  input[type=color] { display: block; width: 100%; height: 34px; padding: 2px; }
+  #themePreview { margin-top: 12px; padding: 14px; border-radius: 6px; border: 1px solid rgba(128,128,128,.4); }
+  #themePreview span { font-weight: 700; }
+</style></head>
+<body>
+  <h1>Wavez Toolkit</h1>
+
+  <h2>Voting</h2>
+  <label class="inline"><input type="checkbox" id="autoWoot"> Auto-woot every track</label>
+  <label>Wait before auto-voting (seconds)<small>Lets you hear the track first. 0 votes immediately.</small>
+    <input type="number" id="voteAfterSec" min="0" max="600"></label>
+  <label>Auto-woot scope
+    <select id="wootScope"><option value="all">Every track</option><option value="following">Only DJs I follow</option></select></label>
+  <label>Blocklist action
+    <select id="blockAction"><option value="off">Off</option><option value="meh">Meh blocklisted tracks</option><option value="mute">Mute blocklisted tracks (volume restores afterwards)</option></select></label>
+  <label>Blocklist<small>One entry per line. Matches anywhere in title or artist. Use <code>dj:username</code> to match a DJ.</small>
+    <textarea id="blocklist"></textarea></label>
+
+  <h2>DJ queue</h2>
+  <label class="inline"><input type="checkbox" id="autoJoin"> Auto-join the DJ queue <small>Have a track ready. Turn this off if you use the leave hotkey.</small></label>
+
+  <h2>Notifications (shown only while the tab is hidden, except "up next")</h2>
+  <label class="inline"><input type="checkbox" id="notifyUpNext"> You're next in the DJ queue</label>
+  <label class="inline"><input type="checkbox" id="notifyMention"> Someone @mentions you</label>
+  <label class="inline"><input type="checkbox" id="notifyTrack"> Every new track</label>
+  <label>Extra chat alert words<small>One per line. Any chat message containing one notifies you.</small>
+    <textarea id="alertWords" style="height:70px"></textarea></label>
+
+  <h2>Away mode</h2>
+  <label class="inline"><input type="checkbox" id="afkEnabled"> AFK auto-reply to @mentions</label>
+  <label>AFK message<small>Sent with an [AFK] prefix, at most once per person every 5 minutes and once per 30 seconds overall. It never replies to other [AFK] messages.</small>
+    <input type="text" id="afkMessage" maxlength="200"></label>
+
+  <h2>Mod assist</h2>
+  <p><small>Works only when your role in a room is in the list below, and switches itself off everywhere else. It detects, alerts, logs and can post chat warnings. It cannot kick, ban, mute or skip: the official wavez.fm extension API has no moderation actions.</small></p>
+  <label class="inline"><input type="checkbox" id="modEnabled"> Enable mod assist</label>
+  <label>Roles that count as moderator<small>One per line. The panel shows your current role in the room, so copy it here if you moderate but it isn't listed.</small>
+    <textarea id="modRoles" style="height:80px"></textarea></label>
+  <label class="inline"><input type="checkbox" id="modWatch"> Flag chat containing watched words</label>
+  <label>Watched words<small>One per line, matched anywhere in a message.</small>
+    <textarea id="modWords" style="height:70px"></textarea></label>
+  <label class="inline"><input type="checkbox" id="modLinks"> Flag links to unapproved sites</label>
+  <label>Allowed domains<small>One per line. Subdomains are allowed too. Only links starting with http(s):// or www. are checked.</small>
+    <textarea id="modAllowedDomains" style="height:70px"></textarea></label>
+  <label class="inline"><input type="checkbox" id="modFlood"> Flag flooding (5+ messages in 10s, or the same message 3 times in 30s)</label>
+  <label class="inline"><input type="checkbox" id="modTracks"> Flag tracks matching these words</label>
+  <label>Track words<small>One per line: title/artist keywords, or <code>dj:username</code>.</small>
+    <textarea id="modTrackWords" style="height:70px"></textarea></label>
+  <label class="inline"><input type="checkbox" id="modAutoWarn"> Post an [auto-mod] chat warning when something is flagged <small>Once per person every 2 minutes, once per 15 seconds overall.</small></label>
+  <label>Warning message <small>{user} becomes @name.</small>
+    <input type="text" id="modWarnMessage" maxlength="190"></label>
+  <label class="inline"><input type="checkbox" id="modWelcome"> Welcome new arrivals <small>At most one greeting per 20 seconds; skipped during join bursts.</small></label>
+  <label>Welcome message
+    <input type="text" id="modWelcomeMessage" maxlength="190"></label>
+  <button id="exportMod">Export mod log (CSV)</button>
+  <button id="clearMod">Clear mod log</button>
+
+  <h2>Room themes</h2>
+  <p><small>Restyles wavez.fm in your browser only; nobody else sees it. Changes here apply immediately (no Save needed). You can also pick a theme per room from the in-page panel.</small></p>
+  <label class="inline"><input type="checkbox" id="themeEnabled"> Enable themes</label>
+  <label>Default theme (used in every room without its own theme)
+    <select id="activeTheme"></select></label>
+  <h3>Create or edit a custom theme</h3>
+  <label>Theme to edit <select id="themeEdit"></select></label>
+  <label>Start from preset <select id="themeBase"></select></label>
+  <label>Name <input type="text" id="themeName" maxlength="40"></label>
+  <div class="colors">
+    <label>Background <input type="color" id="themeBg"></label>
+    <label>Text <input type="color" id="themeFg"></label>
+    <label>Accent <input type="color" id="themeAccent"></label>
+  </div>
+  <label>Background image <small>Optional. An https:// link to an image. The site's security rules may block images from some hosts.</small>
+    <input type="text" id="themeImage" maxlength="500" placeholder="https://..."></label>
+  <label>Extra CSS <small>Optional, for fine-tuning parts of the site. Variables available: <code>--wtk-bg</code>, <code>--wtk-fg</code>, <code>--wtk-accent</code>.</small>
+    <textarea id="themeCss" style="height:90px" maxlength="5000" placeholder=".some-class { background: var(--wtk-accent); }"></textarea></label>
+  <div id="themePreview">Preview: <span>accent</span> on this background</div>
+  <button id="themeSave">Save theme</button>
+  <button id="themeDelete">Delete theme</button>
+  <button id="themeClearRooms">Clear per-room choices</button>
+
+  <h2>Audio and controls</h2>
+  <label>Fade-in at each new track (seconds, 0 = off)<small>Ramps the volume up from near-silent. Moving the volume yourself cancels it.</small>
+    <input type="number" id="fadeInSec" min="0" max="30"></label>
+  <label class="inline"><input type="checkbox" id="hotkeys"> Hotkeys: Alt+Shift+W woot, +M meh, +S mute toggle, +Q join/leave queue</label>
+  <label>Panel theme
+    <select id="panelTheme"><option value="dark">Dark</option><option value="light">Light</option><option value="auto">Match system</option></select></label>
+
+  <button id="save">Save</button>
+  <h2>Data</h2>
+  <button id="export">Export track history (CSV)</button>
+  <button id="clear">Clear track history</button>
+  <button id="resetStats">Reset my DJ stats</button>
+  <p id="status" role="status"></p>
+  <script src="shared.js"></script>
+  <script src="options.js"></script>
+</body></html>

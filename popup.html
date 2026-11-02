@@ -1,0 +1,21 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="popup.css"></head>
+<body>
+  <header><strong>Wavez Toolkit</strong><a href="#" id="opts">Options</a></header>
+  <section id="status" class="card"></section>
+
+  <section class="card">
+    <label class="row"><input type="checkbox" id="autoWoot"> Auto-woot</label>
+    <label class="row"><input type="checkbox" id="autoJoin"> Auto-join DJ queue <small>(have a track ready)</small></label>
+    <label class="row">Blocklist action
+      <select id="blockAction"><option value="off">Off</option><option value="meh">Meh</option><option value="mute">Mute</option></select>
+    </label>
+    <button id="blockArtist">Block this artist</button>
+    <div id="msg" class="muted"></div>
+  </section>
+
+  <h2>Recent tracks</h2>
+  <div id="history"></div>
+  <script src="shared.js"></script>
+  <script src="popup.js"></script>
+</body></html>
