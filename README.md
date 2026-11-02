@@ -68,4 +68,4 @@ Version `0.6.1`. This is an independently maintained toolkit for WavezFM and is 
 
 ## License
 
-No license has been specified yet. Until a license is added, the repository should be treated as source-available for inspection and personal testing rather than granting broad reuse rights.
+Wavez Toolkit is released under the [MIT License](LICENSE). See the `LICENSE` file for the full license text.
