@@ -16,8 +16,11 @@
     } catch { return null; }
   };
 
-  const newCur = (key) => ({ key, seenAt: Date.now(), nextAt: 0, delay: 1000, mutedFrom: null });
-  const CMDS = new Set(["woot", "meh", "toggleMute", "joinLeave"]);
+  const newCur = (key) => ({ key, seenAt: Date.now(), nextAt: 0, delay: 1000, mutedFrom: null, grabAt: 0, grabDelay: 2000, grabTries: 0 });
+  const CMDS = new Set(["woot", "meh", "toggleMute", "joinLeave", "grab", "sleep15", "sleep30", "sleep60", "sleepOff"]);
+  const HK_DEFAULT = { woot: "W", meh: "M", mute: "S", queue: "Q", grab: "G", star: "F", panel: "P" };
+  const HK_CMD = { woot: "woot", meh: "meh", mute: "toggleMute", queue: "joinLeave", grab: "grab" };
+  const HK_UI = { star: "star", panel: "togglePanel" };
 
   let S = null;
   let api = null;
@@ -28,6 +31,9 @@
   let joinDelay = 5000;
   let wasNext = false;
   let manualMuteFrom = null;
+  let sleepAt = 0, sleepBase = 0;
+  let titleBackup = null;
+  let chatKeys = [], diagState = false;
   let fade = null;
   let afkLastAny = 0;
   const afkSeen = new Map();
@@ -38,6 +44,76 @@
   const welcomed = new Set();
 
   const getState = () => { try { return api ? api.room.getState() : null; } catch { return null; } };
+
+  // ---------- grab (only through an action the official API actually provides) ----------
+  let grabState = "idle"; // idle | ok | error | unsupported
+  const GRAB_FNS = ["grab", "grabTrack", "grabCurrent"];
+  const grabFn = () => {
+    const a = api && api.actions;
+    return a ? GRAB_FNS.find((k) => typeof a[k] === "function") || null : null;
+  };
+  function tryGrab() {
+    const name = grabFn();
+    if (!name) { grabState = "unsupported"; return; }
+    try {
+      const r = api.actions[name]();
+      if (r && typeof r.then === "function") r.then(() => { grabState = "ok"; }, () => { grabState = "error"; });
+      else grabState = "ok";
+    } catch { grabState = "error"; }
+  }
+  const favKey = (pb) => String(pb.title ?? "").trim().toLowerCase() + "|" + String(pb.artist ?? "").trim().toLowerCase();
+  const isFav = (pb) => (S.favorites || []).some((f) => f && f.k === favKey(pb));
+
+  // Per-room override ("on"/"off") for a few settings, falling back to the global value.
+  function opt(k, st) {
+    const ro = S.roomOverrides, slug = st && st.room && st.room.slug;
+    const o = ro && slug && Object.prototype.hasOwnProperty.call(ro, slug) ? ro[slug] : null;
+    const v = o && o[k];
+    return v === "on" ? true : v === "off" ? false : !!S[k];
+  }
+
+  // Names only (never values) of what the site's API offers; shown on the Options page to help debugging.
+  const apiKeys = (o) => {
+    try {
+      const out = new Set();
+      for (let p = o, i = 0; p && p !== Object.prototype && i < 3; p = Object.getPrototypeOf(p), i++) {
+        Object.getOwnPropertyNames(p).forEach((k) => { if (k !== "constructor") out.add(k); });
+      }
+      return [...out].slice(0, 80);
+    } catch { return []; }
+  };
+  function sendDiag() {
+    if (!api) return;
+    send("diag", { version: String(api.version), api: apiKeys(api), actions: apiKeys(api.actions),
+      room: apiKeys(api.room), state: apiKeys(getState()), chat: chatKeys });
+  }
+
+  function cancelSleep() {
+    if (sleepBase > 0) call(() => api.actions.setVolume(sleepBase));
+    sleepAt = 0; sleepBase = 0;
+  }
+  // Fades the volume out over the last 20 seconds, then mutes (the mute key restores the old volume).
+  function sleepStep(st) {
+    if (!sleepAt || !st) return;
+    const left = sleepAt - Date.now();
+    if (left > 20000) return;
+    stopFade();
+    if (!sleepBase) sleepBase = manualMuteFrom == null && st.volume > 0 ? st.volume : -1;
+    if (left > 0) {
+      if (sleepBase > 0) call(() => api.actions.setVolume(Math.max(1, Math.round(sleepBase * left / 20000))));
+    } else {
+      if (sleepBase > 0) { call(() => api.actions.setVolume(0)); manualMuteFrom = sleepBase; }
+      sleepAt = 0; sleepBase = 0;
+    }
+  }
+  function titleStep(pb) {
+    if (typeof document.title !== "string") return;
+    if (S.tabTitle && pb) {
+      const want = `▶ ${pb.title} - ${pb.artist}`;
+      if (titleBackup == null) titleBackup = document.title;
+      if (document.title !== want) document.title = want;
+    } else if (titleBackup != null) { document.title = titleBackup; titleBackup = null; }
+  }
 
   window.addEventListener("message", (e) => {
     const d = e.data;
@@ -68,7 +144,21 @@
     const u = st.currentUser;
     return [st.room.viewerRole, u && u.roomRole, u && u.globalRole].some(isModRole);
   }
-  const modActive = (st) => !!(S && S.modEnabled && isModNow(st));
+  const modActive = (st) => !!(S && S.modEnabled && isModNow(st) &&
+    (!(S.modOnlyRooms || []).length || S.modOnlyRooms.map(lc).includes(lc(st.room.slug))));
+  const reCache = new Map();
+  function wordHit(raw, text, lower) {
+    const k = String(raw || "").trim();
+    if (!k) return false;
+    if (k.slice(0, 3).toLowerCase() === "re:") {
+      const src = k.slice(3).trim().slice(0, 80);
+      if (!src) return false;
+      let re = reCache.get(src);
+      if (re === undefined) { try { re = new RegExp(src, "i"); } catch { re = null; } reCache.set(src, re); }
+      return !!re && re.test(text.slice(0, 500));
+    }
+    return lower.includes(k.toLowerCase());
+  }
   function findUser(st, name) {
     const n = lc(name);
     if (!n || !Array.isArray(st.users)) return null;
@@ -151,7 +241,7 @@
   }
   function startFade(base) {
     const dur = (Number(S.fadeInSec) || 0) * 1000;
-    if (dur <= 0 || !base) return;
+    if (dur <= 0 || !base || (sleepAt && sleepAt - Date.now() <= 20000)) return;
     fade = { target: base, t0: Date.now(), dur, sets: [], timer: null };
     setFadeVol(Math.max(1, Math.round(base * 0.05)));
     fade.timer = setInterval(fadeStep, 400);
@@ -163,6 +253,13 @@
     if (!st) return;
     if (name === "woot" || name === "meh") {
       if (st.votes && st.votes.canVote && !st.queue.isCurrentDj) call(() => api.actions.vote(name));
+    } else if (name === "sleepOff") {
+      cancelSleep();
+    } else if (name.startsWith("sleep")) {
+      cancelSleep();
+      sleepAt = Date.now() + Number(name.slice(5)) * 60000;
+    } else if (name === "grab") {
+      if (!st.votes.clientGrabbed && !st.queue.isCurrentDj) tryGrab();
     } else if (name === "toggleMute") {
       stopFade();
       if (manualMuteFrom != null) {
@@ -182,10 +279,12 @@
     if (!S || !S.hotkeys || !api || !e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey) return;
     const t = e.target;
     if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
-    const c = { KeyW: "woot", KeyM: "meh", KeyS: "toggleMute", KeyQ: "joinLeave" }[e.code];
-    if (!c) return;
+    const keys = Object.assign({}, HK_DEFAULT, S.hotkeyKeys || {});
+    const id = Object.keys(keys).find((k) => e.code === "Key" + String(keys[k]).toUpperCase());
+    if (!id) return;
     e.preventDefault();
-    command(c);
+    if (HK_CMD[id]) command(HK_CMD[id]);
+    else if (HK_UI[id]) send("ui", { name: HK_UI[id] });
   }, true);
 
   // ---------- track change ----------
@@ -202,6 +301,9 @@
     if (modActive(st) && S.modTracks) {
       const k = trackMatch(S.modTrackWords, pb);
       if (k) send("modflag", { user: String(pb.djUsername || ""), reason: `track matches "${k}"`, text: `${pb.title} - ${pb.artist}` });
+    }
+    if (S.notifyFavorite && document.hidden && isFav(pb) && !S.notifyTrack) {
+      send("notify", { id: "fav", title: "A favorite is playing", message: `${pb.title || ""} - ${pb.artist || ""}` });
     }
     if (S.notifyTrack && document.hidden) {
       send("notify", {
@@ -223,6 +325,8 @@
         myVote: v.clientVote, grabbed: v.clientGrabbed, canVote: v.canVote,
         isDj: st.queue.isCurrentDj, queued: st.queue.isJoined,
         listeners: st.room.activeUsersCount, muted: !!muted,
+        grab: grabFn() ? grabState : "unsupported",
+        sleep: sleepAt ? Math.max(1, Math.ceil((sleepAt - Date.now()) / 60000)) : 0,
         queuePos: qi ? qi.pos : 0, etaMs: qi ? qi.eta : null,
         role: String(st.room.viewerRole || (st.currentUser && st.currentUser.roomRole) || ""), isMod: isModNow(st)
       };
@@ -235,7 +339,10 @@
   function tick() {
     if (!S || !api) return;
     const st = getState();
-    if (!st || !st.playback) { flushTrack(); report(null); return; }
+    sleepStep(st);
+    if (st && !diagState) { diagState = true; sendDiag(); }
+    if (!st || !st.playback) { flushTrack(); titleStep(null); report(null); return; }
+    titleStep(st.playback);
 
     const pb = st.playback, v = st.votes;
     if (pb.playbackKey !== cur.key) onTrackChange(st);
@@ -260,14 +367,31 @@
       restoreVolume(st);
     }
 
+    const vip = (S.wootDjs || []).map(lc).includes(lc(pb.djUsername));
     const canAct = v.trackId === pb.trackId && v.canVote && !st.queue.isCurrentDj && !v.clientVotePending;
     const waited = Date.now() - cur.seenAt >= (Number(S.voteAfterSec) || 0) * 1000;
     if (canAct && waited && !v.clientVote) {
       if (blocked && S.blockAction === "meh") attempt("meh");
-      else if (S.autoWoot && !blocked && (S.wootScope !== "following" || (st.social && st.social.isFollowingCurrentDj))) attempt("woot");
+      else if (!blocked && (vip || (opt("autoWoot", st) && v.woots >= (Number(S.crowdWoots) || 0) &&
+        (S.wootScope === "following" ? !!(st.social && st.social.isFollowingCurrentDj)
+          : S.wootScope === "starred" ? isFav(pb) : true)))) attempt("woot");
     }
 
-    if (S.autoJoin) {
+    if (opt("autoGrab", st) && v.trackId === pb.trackId && !v.clientGrabbed && !st.queue.isCurrentDj && !blocked &&
+        cur.grabTries < 4 && Date.now() >= cur.grabAt) {
+      const m = S.grabMode;
+      const ok = m === "voted" ? v.clientVote === "woot"
+        : m === "starred" ? isFav(pb)
+        : m === "minwoots" ? v.woots >= (Number(S.grabMinWoots) || 0) : true;
+      if (ok) {
+        cur.grabAt = Date.now() + cur.grabDelay;
+        cur.grabDelay = Math.min(cur.grabDelay * 2, 15000);
+        cur.grabTries++;
+        tryGrab();
+      }
+    }
+
+    if (opt("autoJoin", st)) {
       const q = st.queue;
       if (q.isJoined || q.isCurrentDj) joinDelay = 5000;
       else if (st.permissions.joinQueue && !q.isLocked && !q.isFull && Date.now() >= joinNext) {
@@ -297,9 +421,11 @@
     knownUsers = new Set(users.map((u) => u.id));
 
     const qi = queueInfo(st);
-    if (qi.pos === 1 && !st.queue.isCurrentDj) {
+    const spots = Math.min(20, Math.max(1, Number(S.upNextSpots) || 1));
+    if (qi.pos >= 1 && qi.pos <= spots && !st.queue.isCurrentDj) {
       if (!wasNext && S.notifyUpNext) {
-        send("notify", { id: "upnext", title: "You're up next!", message: `${st.room.name}: get your track ready` });
+        send("notify", { id: "upnext", title: qi.pos === 1 ? "You're up next!" : `You're #${qi.pos} in the queue`,
+          message: `${st.room.name}: get your track ready` });
       }
       wasNext = true;
     } else wasNext = false;
@@ -334,8 +460,8 @@
     if (u && (isModRole(u.role) || isModRole(u.platformRole) || lc(u.platformRole) === "bot")) return;
     const reasons = [];
     if (S.modWatch) {
-      const w = (S.modWords || []).map(lc).find((k) => k && lower.includes(k));
-      if (w) reasons.push(`watched word "${w}"`);
+      const w = (S.modWords || []).find((k) => wordHit(k, text, lower));
+      if (w) reasons.push(`watched word "${String(w).slice(0, 30)}"`);
     }
     if (S.modLinks) {
       const host = badLinkHost(lower);
@@ -353,7 +479,8 @@
       else if (repeats >= 3) reasons.push("repeating the same message");
     }
     if (!reasons.length) return;
-    const reason = reasons.join("; ");
+    const note = (S.modNotes || []).map(String).find((l) => lc(l.split(":")[0]) === f);
+    const reason = reasons.join("; ") + (note ? ` [note: ${note.slice(note.indexOf(":") + 1).trim().slice(0, 40)}]` : "");
     send("modflag", { user: from, reason, text: text.slice(0, 120) });
     if (S.modAutoWarn) warnUser(f, u ? (u.displayUsername || u.username) : from, reason);
   }
@@ -361,6 +488,7 @@
   // Chat payload shape is not documented, so read it defensively.
   function onChat(m) {
     if (!S || !m || typeof m !== "object") return;
+    if (!chatKeys.length) { chatKeys = apiKeys(m).slice(0, 30); sendDiag(); }
     const st = getState();
     const me = st && st.currentUser;
     if (!me) return;
@@ -374,7 +502,9 @@
     const mention = names.some((n) => lower.includes("@" + n));
     if (mention && S.afkEnabled) afkReply(from.toLowerCase());
     if (!document.hidden) return;
-    if (mention && S.notifyMention) {
+    if (!mention && (S.alertUsers || []).map(lc).includes(lc(from))) {
+      send("notify", { id: "alertuser", title: `${from} said`, message: text.slice(0, 200) });
+    } else if (mention && S.notifyMention) {
       send("notify", { id: "mention", title: `Mention from ${from || "someone"}`, message: text.slice(0, 200) });
     } else {
       const w = (S.alertWords || []).map((k) => String(k).trim().toLowerCase()).find((k) => k && lower.includes(k));

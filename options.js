@@ -1,25 +1,86 @@
 const $ = (id) => document.getElementById(id);
-const checks = ["autoWoot", "autoJoin", "notifyTrack", "notifyMention", "notifyUpNext", "afkEnabled", "hotkeys",
-  "modEnabled", "modWatch", "modLinks", "modFlood", "modTracks", "modAutoWarn", "modWelcome"];
-const lists = ["blocklist", "alertWords", "modRoles", "modWords", "modAllowedDomains", "modTrackWords"];
-const texts = ["blockAction", "afkMessage", "panelTheme", "wootScope", "modWarnMessage", "modWelcomeMessage"];
+const checks = ["autoGrab", "notifyFavorite", "quietEnabled", "autoWoot", "autoJoin", "notifyTrack", "notifyMention", "notifyUpNext", "afkEnabled", "hotkeys",
+  "tabTitle", "modEnabled", "modWatch", "modLinks", "modFlood", "modTracks", "modAutoWarn", "modWelcome"];
+const rawLists = ["modNotes"]; // kept as typed (not lowercased)
+const nums = { voteAfterSec: 600, fadeInSec: 30, grabMinWoots: 9999, crowdWoots: 9999, upNextSpots: 20 };
+const HK = { woot: "hkWoot", meh: "hkMeh", mute: "hkMute", queue: "hkQueue", grab: "hkGrab", star: "hkStar", panel: "hkPanel" };
+const lists = ["wootDjs", "alertUsers", "modOnlyRooms", "blocklist", "alertWords", "modRoles", "modWords", "modAllowedDomains", "modTrackWords"];
+const texts = ["grabMode", "quietFrom", "quietTo", "blockAction", "afkMessage", "panelTheme", "wootScope", "modWarnMessage", "modWelcomeMessage"];
+const allKeys = [...checks, ...Object.keys(nums), ...texts, ...lists, ...rawLists];
 const say = (t) => { $("status").textContent = t; };
 
-browser.storage.local.get(DEFAULTS).then((s) => {
-  checks.forEach((k) => { $(k).checked = !!s[k]; });
-  lists.forEach((k) => { $(k).value = s[k].join("\n"); });
-  ["voteAfterSec", "fadeInSec", ...texts].forEach((k) => { $(k).value = s[k]; });
+// Lowercase everything except the pattern part of "re:" lines, so escapes like \S keep their meaning.
+const lcLine = (l) => (l.slice(0, 3).toLowerCase() === "re:" ? "re:" + l.slice(3).trim() : l.toLowerCase());
+const lines = (k) => $(k).value.split("\n").map((l) => l.trim()).filter(Boolean);
+
+function readKey(k) {
+  if (checks.includes(k)) return $(k).checked;
+  if (k in nums) return Math.min(nums[k], Math.max(k === "upNextSpots" ? 1 : 0, Number($(k).value) || 0));
+  if (texts.includes(k)) {
+    const v = $(k).value.slice(0, 200);
+    return (k === "quietFrom" || k === "quietTo") && !/^\d{2}:\d{2}$/.test(v) ? DEFAULTS[k] : v;
+  }
+  if (rawLists.includes(k)) return lines(k).map((l) => l.slice(0, 200));
+  const a = lines(k).map(lcLine);
+  return k === "modAllowedDomains"
+    ? a.map((d) => d.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "")).filter(Boolean) : a;
+}
+function readHotkeys() {
+  const keys = {};
+  for (const [cmd, id] of Object.entries(HK)) {
+    const v = $(id).value.trim().toUpperCase();
+    keys[cmd] = /^[A-Z]$/.test(v) ? v : DEFAULTS.hotkeyKeys[cmd];
+  }
+  return new Set(Object.values(keys)).size === Object.keys(keys).length ? keys : null;
+}
+
+function fillKey(k, s) {
+  const e = $(k);
+  if (document.activeElement === e) return; // never overwrite what's being typed
+  if (checks.includes(k)) e.checked = !!s[k];
+  else if (lists.includes(k) || rawLists.includes(k)) e.value = s[k].join("\n");
+  else e.value = s[k];
+}
+function fillHotkeys(s) {
+  Object.entries(HK).forEach(([cmd, id]) => {
+    if (document.activeElement !== $(id)) $(id).value = (s.hotkeyKeys && s.hotkeyKeys[cmd]) || DEFAULTS.hotkeyKeys[cmd];
+  });
+}
+browser.storage.local.get(DEFAULTS).then((s) => { allKeys.forEach((k) => fillKey(k, s)); fillHotkeys(s); });
+// Keep the form in step with changes made elsewhere (the in-page panel, the popup, a restore).
+browser.storage.onChanged.addListener((ch, area) => {
+  const keys = area === "local" ? Object.keys(ch).filter((k) => k in DEFAULTS) : [];
+  if (!keys.length) return;
+  browser.storage.local.get(DEFAULTS).then((s) => {
+    keys.forEach((k) => { if (allKeys.includes(k)) fillKey(k, s); });
+    if (keys.includes("hotkeyKeys")) fillHotkeys(s);
+  });
 });
 
+// Each field saves only its own setting, shortly after you change it.
+const timers = {};
+async function saveKey(k) {
+  if (k === "hotkeyKeys") {
+    const h = readHotkeys();
+    if (!h) return say("Each hotkey needs a different letter. Not saved yet.");
+    await browser.storage.local.set({ hotkeyKeys: h });
+  } else await browser.storage.local.set({ [k]: readKey(k) });
+  say("Saved.");
+}
+function wire(k, ids) {
+  ids.forEach((id) => {
+    $(id).addEventListener("input", () => { clearTimeout(timers[k]); timers[k] = setTimeout(() => saveKey(k), 700); });
+    $(id).addEventListener("change", () => { clearTimeout(timers[k]); saveKey(k); });
+  });
+}
+allKeys.forEach((k) => wire(k, [k]));
+wire("hotkeyKeys", Object.values(HK));
+
 $("save").addEventListener("click", async () => {
-  const s = {
-    voteAfterSec: Math.min(600, Math.max(0, Number($("voteAfterSec").value) || 0)),
-    fadeInSec: Math.min(30, Math.max(0, Number($("fadeInSec").value) || 0)),
-  };
-  texts.forEach((k) => { s[k] = $(k).value.slice(0, 200); });
-  checks.forEach((k) => { s[k] = $(k).checked; });
-  lists.forEach((k) => { s[k] = $(k).value.split("\n").map((l) => l.trim().toLowerCase()).filter(Boolean); });
-  s.modAllowedDomains = s.modAllowedDomains.map((d) => d.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "")).filter(Boolean);
+  const h = readHotkeys();
+  if (!h) return say("Each hotkey needs a different letter. Not saved.");
+  const s = { hotkeyKeys: h };
+  allKeys.forEach((k) => { s[k] = readKey(k); });
   await browser.storage.local.set(s);
   say("Saved.");
 });
@@ -85,6 +146,13 @@ async function themeInit(editId) {
   ["activeTheme", "themeEdit", "themeBase"].forEach((k) => { $(k).textContent = ""; });
   [...PRESET_THEMES, ...s.customThemes].forEach((t) => addOpt($("activeTheme"), t.id, t.name));
   $("activeTheme").value = findTheme(s, s.activeTheme) ? s.activeTheme : "midnight";
+  ["themeDay", "themeNight"].forEach((k) => {
+    $(k).textContent = "";
+    [...PRESET_THEMES, ...s.customThemes].forEach((t) => addOpt($(k), t.id, t.name));
+    $(k).value = findTheme(s, s[k]) ? s[k] : (k === "themeDay" ? "paper" : "midnight");
+  });
+  $("themeSchedule").value = s.themeSchedule;
+  $("themeNightFrom").value = s.themeNightFrom; $("themeNightTo").value = s.themeNightTo;
   addOpt($("themeEdit"), "", "New theme...");
   s.customThemes.forEach((t) => addOpt($("themeEdit"), t.id, t.name));
   addOpt($("themeBase"), "", "Choose...");
@@ -138,3 +206,179 @@ $("themeDelete").addEventListener("click", async () => {
 
 $("themeClearRooms").addEventListener("click", async () => { await browser.storage.local.set({ roomThemes: {} }); say("Per-room theme choices cleared."); });
 themeInit("");
+
+// ---- Theme schedule (auto-saved) ----
+["themeSchedule", "themeDay", "themeNight", "themeNightFrom", "themeNightTo"].forEach((k) =>
+  $(k).addEventListener("change", () => {
+    const v = $(k).value;
+    if ((k === "themeNightFrom" || k === "themeNightTo") && !/^\d{2}:\d{2}$/.test(v)) return;
+    browser.storage.local.set({ [k]: v });
+  }));
+
+// ---- Import / export helpers ----
+const HEX = /^#[0-9a-f]{6}$/i;
+const IMG = /^https:\/\/[^\s"'()\\]+$/;
+function cleanTheme(t, id) {
+  if (!t || typeof t !== "object" || !HEX.test(t.bg) || !HEX.test(t.fg) || !HEX.test(t.accent)) return null;
+  const image = String(t.image || "").trim();
+  return {
+    id: id || String(t.id || "").replace(/[^\w-]/g, "").slice(0, 24) || "c" + Date.now().toString(36),
+    name: String(t.name || "Imported theme").slice(0, 40),
+    bg: t.bg.toLowerCase(), fg: t.fg.toLowerCase(), accent: t.accent.toLowerCase(),
+    image: IMG.test(image) ? image : "", css: String(t.css || "").slice(0, 5000)
+  };
+}
+function download(name, obj) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+const readJson = (file) => new Promise((res, rej) => {
+  if (!file || file.size > 2e6) return rej(new Error("File missing or too large."));
+  const r = new FileReader();
+  r.onload = () => { try { res(JSON.parse(r.result)); } catch { rej(new Error("That file isn't valid JSON.")); } };
+  r.onerror = () => rej(new Error("Couldn't read that file."));
+  r.readAsText(file);
+});
+
+// ---- Theme export / import (import fills the editor; press Save theme to keep it) ----
+$("themeExport").addEventListener("click", () => {
+  const t = cleanTheme({ name: $("themeName").value, bg: $("themeBg").value, fg: $("themeFg").value,
+    accent: $("themeAccent").value, image: $("themeImage").value, css: $("themeCss").value });
+  download("wavez-theme-" + t.name.replace(/[^\w-]+/g, "_") + ".json", { type: "wavez-toolkit-theme", ...t, id: undefined });
+  say("Theme exported.");
+});
+$("themeImportBtn").addEventListener("click", () => $("themeImport").click());
+$("themeImport").addEventListener("change", async () => {
+  try {
+    const t = cleanTheme(await readJson($("themeImport").files[0]), "x");
+    if (!t) throw new Error("That isn't a valid theme file.");
+    $("themeEdit").value = "";
+    themeFill(t);
+    say(`Loaded "${t.name}". Press Save theme to keep it.`);
+  } catch (e) { say(e.message); }
+  $("themeImport").value = "";
+});
+
+// ---- Backup / restore ----
+const ENUMS = {
+  grabMode: ["all", "voted", "starred", "minwoots"], wootScope: ["all", "following", "starred"],
+  blockAction: ["off", "meh", "mute"], panelTheme: ["dark", "light", "auto"], themeSchedule: ["off", "time", "system"]
+};
+function cleanSettings(data) {
+  const defs = { ...DEFAULTS, ...THEME_DEFAULTS }, out = {};
+  for (const [k, def] of Object.entries(defs)) {
+    if (!(k in data)) continue;
+    let v = data[k];
+    if (Array.isArray(def)) { if (!Array.isArray(v)) continue; }
+    else if (typeof v !== typeof def || v === null || Array.isArray(v)) continue;
+    if (typeof v === "string") { v = v.slice(0, 5000); if (ENUMS[k] && !ENUMS[k].includes(v)) continue; }
+    else if (typeof v === "number") { if (!Number.isFinite(v)) continue; v = Math.min(1e6, Math.max(0, v)); }
+    else if (k === "customThemes") v = v.map((t) => cleanTheme(t)).filter(Boolean).slice(0, 50);
+    else if (k === "favorites") {
+      v = v.filter((f) => f && typeof f.title === "string").slice(0, 500)
+        .map((f) => ({ k: trackKey(f.title, f.artist), title: String(f.title).slice(0, 200), artist: String(f.artist || "").slice(0, 200), ts: Number(f.ts) || 0 }));
+    } else if (k === "hotkeyKeys") {
+      const h = {};
+      Object.keys(def).forEach((c) => { h[c] = /^[A-Za-z]$/.test(v[c]) ? v[c].toUpperCase() : def[c]; });
+      v = h;
+    } else if (k === "roomOverrides") {
+      const r = {};
+      Object.entries(v).slice(0, 500).forEach(([slug, o]) => {
+        if (!o || typeof o !== "object") return;
+        const c = {};
+        ["autoWoot", "autoGrab", "autoJoin"].forEach((x) => { if (o[x] === "on" || o[x] === "off") c[x] = o[x]; });
+        if (Object.keys(c).length) r[slug.slice(0, 80)] = c;
+      });
+      v = r;
+    } else if (k === "roomThemes") {
+      const r = {};
+      Object.entries(v).slice(0, 500).forEach(([slug, id]) => { if (typeof id === "string") r[slug.slice(0, 80)] = id.slice(0, 40); });
+      v = r;
+    } else if (Array.isArray(v)) v = v.filter((x) => typeof x === "string").map((x) => x.slice(0, 300)).slice(0, 2000);
+    out[k] = v;
+  }
+  return out;
+}
+$("backupExport").addEventListener("click", async () => {
+  const data = await browser.storage.local.get({ ...DEFAULTS, ...THEME_DEFAULTS });
+  download("wavez-toolkit-settings.json", { type: "wavez-toolkit-backup", version: 1, data });
+  say("Settings exported.");
+});
+$("backupImportBtn").addEventListener("click", () => $("backupImport").click());
+$("backupImport").addEventListener("change", async () => {
+  try {
+    const f = await readJson($("backupImport").files[0]);
+    if (!f || f.type !== "wavez-toolkit-backup" || !f.data || typeof f.data !== "object") throw new Error("That isn't a Wavez Toolkit backup.");
+    const clean = cleanSettings(f.data);
+    await browser.storage.local.set(clean);
+    say(`Restored ${Object.keys(clean).length} settings. Reloading...`);
+    setTimeout(() => location.reload(), 800);
+  } catch (e) { say(e.message); }
+  $("backupImport").value = "";
+});
+
+// ---- Track history viewer ----
+async function renderHist() {
+  const { history, favorites } = await browser.storage.local.get({ history: [], favorites: [] });
+  const q = $("histSearch").value.trim().toLowerCase();
+  const rows = history.filter((t) => !q || `${t.title} ${t.artist} ${t.dj}`.toLowerCase().includes(q));
+  const sum = $("histSummary");
+  const top = [...history].sort((a, b) => b.woots - a.woots)[0];
+  sum.textContent = history.length
+    ? `${history.length} tracks logged · you wooted ${history.filter((t) => t.myVote === "woot").length} · grabbed ${history.filter((t) => t.grabbed).length} · ${favorites.length} starred` +
+      (top ? ` · most wooted: ${top.title} (${top.woots})` : "")
+    : "Nothing logged yet.";
+  const box = $("histList");
+  box.textContent = "";
+  rows.slice(0, 100).forEach((t) => {
+    const k = trackKey(t.title, t.artist);
+    const starred = favorites.some((f) => f.k === k);
+    const r = document.createElement("div"); r.className = "hrow";
+    const txt = document.createElement("div"); txt.className = "t";
+    const a = document.createElement("div"); a.textContent = `${t.title} - ${t.artist}`;
+    const b = document.createElement("small");
+    b.textContent = `DJ ${t.dj} · 👍${t.woots} 👎${t.mehs} ❤${t.grabs} · ${new Date(t.ts).toLocaleString()}`;
+    txt.append(a, b);
+    const btn = document.createElement("button");
+    btn.textContent = starred ? "★" : "☆"; btn.title = starred ? "Unstar" : "Star";
+    btn.addEventListener("click", async () => {
+      const { favorites: fv } = await browser.storage.local.get({ favorites: [] });
+      const i = fv.findIndex((f) => f.k === k);
+      if (i >= 0) fv.splice(i, 1); else fv.unshift({ k, title: t.title, artist: t.artist, ts: Date.now() });
+      await browser.storage.local.set({ favorites: fv.slice(0, 500) });
+    });
+    r.append(txt, btn);
+    box.append(r);
+  });
+  if (history.length && !rows.length) box.textContent = "No matches.";
+}
+$("histSearch").addEventListener("input", renderHist);
+browser.storage.onChanged.addListener((ch, area) => { if (area === "local" && (ch.history || ch.favorites)) renderHist(); });
+renderHist();
+
+// ---- Per-room rules and diagnostics ----
+$("clearRoomRules").addEventListener("click", async () => { await browser.storage.local.set({ roomOverrides: {} }); say("Per-room rules cleared."); });
+
+$("diagBtn").addEventListener("click", async () => {
+  const { diag } = await browser.storage.local.get({ diag: null });
+  const out = $("diagOut");
+  if (!diag) { out.textContent = "No data yet. Open wavez.fm, join a room, then press this again."; return; }
+  const g = ["grab", "grabTrack", "grabCurrent"].find((n) => diag.actions.includes(n));
+  const list = (a) => (a.length ? a.join(", ") : "(none seen yet)");
+  out.textContent = [
+    `Captured ${new Date(diag.ts).toLocaleString()} (API version ${diag.version})`,
+    `Grab: ${g ? "available as actions." + g : "no grab action found, so auto-grab can't run"}`,
+    `Actions: ${list(diag.actions)}`,
+    `Room functions: ${list(diag.room)}`,
+    `State fields: ${list(diag.state)}`,
+    `Chat message fields: ${list(diag.chat)}`,
+    `API: ${list(diag.api)}`
+  ].join("\n");
+});
+$("diagCopy").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText($("diagOut").textContent); say("Copied."); } catch { say("Couldn't copy."); }
+});

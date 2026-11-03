@@ -1,9 +1,12 @@
 // Floating in-page panel (isolated world, shadow DOM). Uses only textContent.
 let pStatus = null;
 let panelRender = null;
+let panelUi = {}; // hotkey-driven actions, filled in below
 function panelStatus(s) { pStatus = s; if (panelRender) panelRender(); }
 
 (() => {
+  const sessionStart = Date.now();
+  let favs = [], roomOv = {};
   const el = (tag, text, cls) => {
     const n = document.createElement(tag);
     if (text !== undefined) n.textContent = text;
@@ -42,6 +45,7 @@ function panelStatus(s) { pStatus = s; if (panelRender) panelRender(); }
     button.small { background:var(--btn); color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:3px 8px; cursor:pointer; }
     button.small:disabled { opacity:.4; cursor:default; }
     .btns button { flex:1; }
+    .btns select { flex:1; min-width:0; background:var(--btn); color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:3px; }
     a { color:var(--link); cursor:pointer; }
     .hidden { display:none; }
   `;
@@ -60,42 +64,79 @@ function panelStatus(s) { pStatus = s; if (panelRender) panelRender(); }
   const btns = el("div", undefined, "btns");
   const bWoot = el("button", "👍", "small"), bMeh = el("button", "👎", "small");
   const bMute = el("button", "🔇", "small"), bQueue = el("button", "Queue", "small");
+  const bGrab = el("button", "❤", "small"), bStar = el("button", "☆", "small");
+  bGrab.title = "Grab this track (Alt+Shift+G by default)"; bStar.title = "Star / unstar this track (Alt+Shift+F by default)";
   bWoot.title = "Woot (Alt+Shift+W)"; bMeh.title = "Meh (Alt+Shift+M)";
   bMute.title = "Mute / unmute (Alt+Shift+S)"; bQueue.title = "Join / leave DJ queue (Alt+Shift+Q)";
-  btns.append(bWoot, bMeh, bMute, bQueue);
+  btns.append(bWoot, bMeh, bGrab, bStar, bMute, bQueue);
+  const bCopy = el("button", "Copy track", "small");
+  const sleepSel = el("select");
+  [["", "Sleep timer..."], ["sleep15", "15 min"], ["sleep30", "30 min"], ["sleep60", "60 min"], ["sleepOff", "Cancel"]]
+    .forEach(([v, t]) => { const o = el("option", t); o.value = v; sleepSel.append(o); });
+  const btns2 = el("div", undefined, "btns"); btns2.append(bCopy, sleepSel);
+  const sleepNote = el("div", "", "muted");
 
   const check = (label) => {
     const i = el("input"); i.type = "checkbox";
     const r = el("label", undefined, "row"); r.append(i, document.createTextNode(label));
     return { i, r };
   };
-  const cWoot = check("Auto-woot"), cJoin = check("Auto-join DJ queue"), cAfk = check("AFK auto-reply");
+  const cWoot = check("Auto-woot"), cJoin = check("Auto-join DJ queue"), cAfk = check("AFK auto-reply"), cGrab = check("Auto-grab tracks");
+  const grabNote = el("div", "", "muted");
   const afkMsg = el("input", undefined, "txt"); afkMsg.type = "text"; afkMsg.placeholder = "AFK message"; afkMsg.maxLength = 200;
   const block = el("select");
   [["off", "Off"], ["meh", "Meh"], ["mute", "Mute"]].forEach(([v, t]) => { const o = el("option", t); o.value = v; block.append(o); });
   const rBlock = el("label", undefined, "row"); rBlock.append(document.createTextNode("Blocklist action"), block);
   const blockBtn = el("button", "Block this artist", "small");
   const msg = el("div", "", "muted");
-  const statsBox = el("div"), histBox = el("div");
+  const statsBox = el("div"), histBox = el("div"), sessBox = el("div");
   const cMod = check("Mod assist"), cModWarn = check("Auto-warn in chat"), cModWelcome = check("Welcome new users");
   const modNote = el("div", "", "muted"), modLogBox = el("div");
   const themeSel = el("select");
   const rTheme = el("label", undefined, "row"); rTheme.append(document.createTextNode("This room"), themeSel);
   const themeNote = el("div", "", "muted");
   let themeSlugShown = null;
-  panel.append(head, statusBox, btns, cWoot.r, cJoin.r, cAfk.r, afkMsg, rBlock, blockBtn, msg,
+  const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const ovSel = {};
+  const rOv = [["autoWoot", "Auto-woot"], ["autoGrab", "Auto-grab"], ["autoJoin", "Auto-join queue"]].map(([k, t]) => {
+    const sel = el("select");
+    [["", "Default"], ["on", "On"], ["off", "Off"]].forEach(([v, x]) => { const o = el("option", x); o.value = v; sel.append(o); });
+    ovSel[k] = sel;
+    const r = el("label", undefined, "row"); r.append(document.createTextNode(t), sel);
+    sel.addEventListener("change", async () => {
+      if (!themeSlugShown) return;
+      const { roomOverrides } = await browser.storage.local.get({ roomOverrides: {} });
+      const cur = hasOwn(roomOverrides, themeSlugShown) ? roomOverrides[themeSlugShown] : {};
+      if (sel.value) cur[k] = sel.value; else delete cur[k];
+      if (Object.keys(cur).length) roomOverrides[themeSlugShown] = cur; else delete roomOverrides[themeSlugShown];
+      await browser.storage.local.set({ roomOverrides });
+    });
+    return r;
+  });
+  function renderRules() {
+    const o = themeSlugShown && hasOwn(roomOv, themeSlugShown) ? roomOv[themeSlugShown] : {};
+    Object.keys(ovSel).forEach((k) => { ovSel[k].value = o[k] || ""; ovSel[k].disabled = !themeSlugShown; });
+  }
+  panel.append(head, statusBox, btns, btns2, sleepNote, cWoot.r, cGrab.r, grabNote, cJoin.r, cAfk.r, afkMsg, rBlock, blockBtn, msg,
     el("h3", "Room theme"), rTheme, themeNote,
+    el("h3", "Rules for this room"), ...rOv,
     el("h3", "Mod assist"), modNote, cMod.r, cModWarn.r, cModWelcome.r, modLogBox,
-    el("h3", "My DJ stats"), statsBox, el("h3", "Recent tracks"), histBox);
+    el("h3", "This session"), sessBox, el("h3", "My DJ stats"), statsBox, el("h3", "Recent tracks"), histBox);
 
   function renderStatus() {
     statusBox.textContent = "";
     const s = pStatus;
     const live = !!(s && s.inRoom);
-    [bWoot, bMeh, bMute, bQueue].forEach((b) => { b.disabled = !live; });
+    [bWoot, bMeh, bMute, bQueue, bStar, bCopy, sleepSel].forEach((b) => { b.disabled = !live; });
+    bGrab.disabled = !live || s.grab === "unsupported";
+    sleepNote.textContent = live && s.sleep ? `Sleep timer: about ${s.sleep} min left` : "";
+    grabNote.textContent = cGrab.i.checked && live && s.grab === "unsupported"
+      ? "The site's extension API has no grab action, so auto-grab can't run."
+      : cGrab.i.checked && live && s.grab === "error" ? "Grab failed; retrying." : "";
+    bStar.textContent = live && favs.some((f) => f.k === trackKey(s.title, s.artist)) ? "★" : "☆";
     blockBtn.disabled = !(live && s.artist);
     const slugNow = live && s.slug ? s.slug : "";
-    if (slugNow !== themeSlugShown) { themeSlugShown = slugNow; renderTheme(); }
+    if (slugNow !== themeSlugShown) { themeSlugShown = slugNow; renderTheme(); renderRules(); }
     const mod = live && s.isMod;
     [cMod.i, cModWarn.i, cModWelcome.i].forEach((i) => { i.disabled = !mod; });
     modNote.textContent = !live ? "Join a room to check your role."
@@ -126,6 +167,11 @@ function panelStatus(s) { pStatus = s; if (panelRender) panelRender(); }
   async function renderHistory() {
     const { history } = await browser.storage.local.get({ history: [] });
     histBox.textContent = "";
+    const mineNow = history.filter((t) => t.ts >= sessionStart);
+    sessBox.textContent = mineNow.length
+      ? `${mineNow.length} tracks · you wooted ${mineNow.filter((t) => t.myVote === "woot").length} · grabbed ${mineNow.filter((t) => t.grabbed).length}`
+      : "Nothing yet this session.";
+    sessBox.className = "muted";
     if (!history.length) { histBox.append(el("div", "Nothing logged yet.", "muted")); return; }
     history.slice(0, 5).forEach((t) => {
       const r = el("div", undefined, "track");
@@ -181,16 +227,39 @@ function panelStatus(s) { pStatus = s; if (panelRender) panelRender(); }
   async function loadSettings() {
     const s = await browser.storage.local.get(DEFAULTS);
     cWoot.i.checked = !!s.autoWoot; cJoin.i.checked = !!s.autoJoin; cAfk.i.checked = !!s.afkEnabled;
+    cGrab.i.checked = !!s.autoGrab; favs = Array.isArray(s.favorites) ? s.favorites : [];
+    roomOv = s.roomOverrides && typeof s.roomOverrides === "object" ? s.roomOverrides : {}; renderRules();
     cMod.i.checked = !!s.modEnabled; cModWarn.i.checked = !!s.modAutoWarn; cModWelcome.i.checked = !!s.modWelcome;
     if (document.activeElement !== afkMsg) afkMsg.value = s.afkMessage;
     block.value = s.blockAction;
     applyTheme(s.panelTheme);
+    renderStatus();
   }
 
   const save = (o) => browser.storage.local.set(o);
   cWoot.i.addEventListener("change", () => save({ autoWoot: cWoot.i.checked }));
   cJoin.i.addEventListener("change", () => save({ autoJoin: cJoin.i.checked }));
   cAfk.i.addEventListener("change", () => save({ afkEnabled: cAfk.i.checked }));
+  cGrab.i.addEventListener("change", () => save({ autoGrab: cGrab.i.checked }));
+  async function toggleStar() {
+    if (!pStatus || !pStatus.inRoom || !pStatus.title) return;
+    const k = trackKey(pStatus.title, pStatus.artist);
+    const { favorites } = await browser.storage.local.get({ favorites: [] });
+    const i = favorites.findIndex((f) => f.k === k);
+    if (i >= 0) favorites.splice(i, 1);
+    else favorites.unshift({ k, title: pStatus.title, artist: pStatus.artist, ts: Date.now() });
+    await save({ favorites: favorites.slice(0, 500) });
+  }
+  bGrab.addEventListener("click", () => sendCmd("grab"));
+  bCopy.addEventListener("click", async () => {
+    if (!pStatus || !pStatus.title) return;
+    try { await navigator.clipboard.writeText(`${pStatus.title} - ${pStatus.artist}`); msg.textContent = "Copied."; }
+    catch { msg.textContent = "Couldn't copy."; }
+  });
+  sleepSel.addEventListener("change", () => { if (sleepSel.value) sendCmd(sleepSel.value); sleepSel.value = ""; });
+  bStar.addEventListener("click", toggleStar);
+  panelUi.star = toggleStar;
+  panelUi.togglePanel = () => pill.click();
   cMod.i.addEventListener("change", () => save({ modEnabled: cMod.i.checked }));
   cModWarn.i.addEventListener("change", () => save({ modAutoWarn: cModWarn.i.checked }));
   cModWelcome.i.addEventListener("change", () => save({ modWelcome: cModWelcome.i.checked }));

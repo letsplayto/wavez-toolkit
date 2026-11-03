@@ -19,7 +19,8 @@ function cleanStatus(s) {
     myVote: vote(s.myVote), grabbed: !!s.grabbed, canVote: !!s.canVote,
     isDj: !!s.isDj, queued: !!s.queued, listeners: num(s.listeners), muted: !!s.muted,
     queuePos: num(s.queuePos), etaMs: s.etaMs == null ? null : num(s.etaMs),
-    role: str(s.role, 40), isMod: !!s.isMod
+    role: str(s.role, 40), isMod: !!s.isMod, sleep: num(s.sleep),
+    grab: ["idle", "ok", "error", "unsupported"].includes(s.grab) ? s.grab : "idle"
   };
 }
 
@@ -42,6 +43,18 @@ window.addEventListener("message", (e) => {
     if (typeof themeSetRoom === "function") themeSetRoom(cs.inRoom ? cs.slug : "");
     if (typeof panelStatus === "function") panelStatus(cs);
     msg = { type: "status", status: cs };
+  }
+  else if (d.type === "diag" && d.payload && typeof d.payload === "object") {
+    const names = (a) => (Array.isArray(a) ? a.filter((x) => typeof x === "string" && /^[\w$]{1,40}$/.test(x)).slice(0, 80) : []);
+    const p = d.payload;
+    browser.storage.local.set({ diag: { ts: Date.now(), version: str(p.version, 20), api: names(p.api),
+      actions: names(p.actions), room: names(p.room), state: names(p.state), chat: names(p.chat) } }).catch(() => {});
+    return;
+  }
+  else if (d.type === "ui") {
+    const n = d.payload && d.payload.name;
+    try { if (n === "star" || n === "togglePanel") panelUi[n](); } catch {}
+    return;
   }
   else if (d.type === "track") { const t = cleanTrack(d.payload); if (t) msg = { type: "track", track: t }; }
   else if (d.type === "modflag" && d.payload) {

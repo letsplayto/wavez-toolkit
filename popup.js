@@ -44,6 +44,7 @@ function bind(id, key, isCheckbox) {
     browser.storage.local.set({ [key]: isCheckbox ? n.checked : n.value }));
 }
 bind("autoWoot", "autoWoot", true);
+bind("autoGrab", "autoGrab", true);
 bind("autoJoin", "autoJoin", true);
 bind("blockAction", "blockAction", false);
 
