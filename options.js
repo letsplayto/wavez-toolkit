@@ -385,6 +385,8 @@ $("diagBtn").addEventListener("click", async () => {
     `Room functions: ${list(diag.room)}`,
     `State fields: ${list(diag.state)}`,
     `Chat message fields: ${list(diag.chat)}`,
+    `Recent errors: ${(diag.errors || []).length ? "" : "none"}`,
+    ...(diag.errors || []).map((e) => `  ${new Date(e.ts).toLocaleTimeString()}  ${e.action}: ${e.msg}${e.n > 1 ? ` (x${e.n})` : ""}`),
     `API: ${list(diag.api)}`
   ].join("\n");
 });

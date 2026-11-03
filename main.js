@@ -8,12 +8,23 @@
   const send = (type, payload) =>
     window.postMessage({ __wtk: 1, dir: "toExt", type, payload }, ORIGIN);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  // Recent API failures, kept so Options > Diagnostics can show them (previously they were silently dropped).
+  const errLog = [];
+  let diagTimer = null;
+  function noteErr(label, e) {
+    const msg = String((e && e.message) || e || "error").replace(/\s+/g, " ").slice(0, 120);
+    const last = errLog[errLog.length - 1];
+    if (last && last.action === label && last.msg === msg) { last.n++; last.ts = Date.now(); }
+    else { errLog.push({ ts: Date.now(), action: label, msg, n: 1 }); if (errLog.length > 20) errLog.shift(); }
+    if (!diagTimer) diagTimer = setTimeout(() => { diagTimer = null; sendDiag(); }, 2000);
+  }
   const call = (fn) => {
+    const label = (/api\.(\w+\.\w+)/.exec(String(fn)) || [])[1] || "call";
     try {
       const r = fn();
-      if (r && typeof r.then === "function") r.catch(() => {});
+      if (r && typeof r.then === "function") r.catch((e) => noteErr(label, e));
       return r;
-    } catch { return null; }
+    } catch (e) { noteErr(label, e); return null; }
   };
 
   const newCur = (key) => ({ key, seenAt: Date.now(), nextAt: 0, delay: 1000, mutedFrom: null, grabAt: 0, grabDelay: 2000, grabTries: 0, starSent: false });
@@ -57,9 +68,9 @@
     if (!name) { grabState = "unsupported"; return; }
     try {
       const r = api.actions[name]();
-      if (r && typeof r.then === "function") r.then(() => { grabState = "ok"; }, () => { grabState = "error"; });
+      if (r && typeof r.then === "function") r.then(() => { grabState = "ok"; }, (e) => { grabState = "error"; noteErr("actions." + name, e); });
       else grabState = "ok";
-    } catch { grabState = "error"; }
+    } catch (e) { grabState = "error"; noteErr("actions." + name, e); }
   }
   const favKey = (pb) => String(pb.title ?? "").trim().toLowerCase() + "|" + String(pb.artist ?? "").trim().toLowerCase();
   const isFav = (pb) => (S.favorites || []).some((f) => f && f.k === favKey(pb));
@@ -85,7 +96,7 @@
   function sendDiag() {
     if (!api) return;
     send("diag", { version: String(api.version), api: apiKeys(api), actions: apiKeys(api.actions),
-      room: apiKeys(api.room), state: apiKeys(getState()), chat: chatKeys });
+      room: apiKeys(api.room), state: apiKeys(getState()), chat: chatKeys, errors: errLog.slice() });
   }
 
   function cancelSleep() {
