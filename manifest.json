@@ -49,7 +49,9 @@
         "shared.js",
         "bridge.js",
         "panel.js",
-        "theme.js"
+        "theme.js",
+        "look.js",
+        "picker.js"
       ],
       "run_at": "document_start"
     }

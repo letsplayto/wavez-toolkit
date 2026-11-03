@@ -124,6 +124,62 @@ function panelStatus(s) { pStatus = s; if (panelRender) panelRender(); }
     const o = themeSlugShown && hasOwn(roomOv, themeSlugShown) ? roomOv[themeSlugShown] : {};
     Object.keys(ovSel).forEach((k) => { ovSel[k].value = o[k] || ""; ovSel[k].disabled = !themeSlugShown; });
   }
+  // ---- Customize page: wallpaper for this room, and the page parts the user picks (room background, chat, ...) ----
+  let lookS = { ...LOOK_DEFAULTS };
+  const wpSel = el("select");
+  const rWp = el("label", undefined, "row"); rWp.append(document.createTextNode("Wallpaper here"), wpSel);
+  const wpNote = el("div", "", "muted");
+  async function renderWallpaper() {
+    wpSel.textContent = "";
+    [["", "Use my default"], ["off", "No wallpaper"], ...[...PRESET_WALLPAPERS, ...lookS.customWallpapers].map((w) => [w.id, w.name])]
+      .forEach(([v, t]) => { const o = el("option", t); o.value = v; wpSel.append(o); });
+    const own = themeSlugShown && hasOwn(lookS.roomWallpapers, themeSlugShown);
+    wpSel.value = own ? lookS.roomWallpapers[themeSlugShown] : "";
+    wpSel.disabled = !themeSlugShown;
+    wpNote.textContent = !(lookS.pageTargets || {}).scene
+      ? "Tip: pick the room background below, or wallpapers only paint the page edges." : "";
+  }
+  wpSel.addEventListener("change", async () => {
+    if (!themeSlugShown) return;
+    const { roomWallpapers } = await browser.storage.local.get({ roomWallpapers: {} });
+    if (wpSel.value) roomWallpapers[themeSlugShown] = wpSel.value; else delete roomWallpapers[themeSlugShown];
+    await save({ roomWallpapers });
+  });
+  const targetCount = (sel) => { if (!safeSelector(sel)) return -1; try { return document.querySelectorAll(sel).length; } catch { return -1; } };
+  const tgtRows = TARGET_ROLES.map((r) => {
+    const row = el("div", undefined, "row"), stat = el("span", "", "muted");
+    stat.style.marginLeft = "auto";
+    const bPick = el("button", "Pick", "small"), bClr = el("button", "Clear", "small");
+    row.append(el("span", r.label), stat, bPick, bClr);
+    bPick.addEventListener("click", async () => {
+      wrap.style.visibility = "hidden"; // get the panel out of the way while picking
+      let sel = null;
+      try { sel = await pickTarget(r.label, r.multi); } finally { wrap.style.visibility = ""; }
+      if (!sel) return;
+      const { pageTargets } = await browser.storage.local.get({ pageTargets: {} });
+      pageTargets[r.id] = sel;
+      await save({ pageTargets });
+    });
+    bClr.addEventListener("click", async () => {
+      const { pageTargets } = await browser.storage.local.get({ pageTargets: {} });
+      delete pageTargets[r.id];
+      await save({ pageTargets });
+    });
+    return { r, stat, row };
+  });
+  function renderTargets() {
+    tgtRows.forEach(({ r, stat }) => {
+      const sel = (lookS.pageTargets || {})[r.id];
+      const n = sel ? targetCount(sel) : null;
+      stat.textContent = n === null ? "not set" : n < 0 ? "invalid" : n === 0 ? "not found" : n === 1 ? "1 found" : `${n} found`;
+    });
+  }
+  async function loadLook() {
+    lookS = await browser.storage.local.get(LOOK_DEFAULTS);
+    renderTargets(); renderWallpaper();
+  }
+  const pickNote = el("div", "Click Pick, then click that part of the page. Chat settings and wallpapers (in Options) use these.", "muted");
+
   // Collapsible sections; open/closed state is remembered.
   const collapsed = {}, sections = [];
   function section(key, title, ...nodes) {
@@ -140,6 +196,7 @@ function panelStatus(s) { pStatus = s; if (panelRender) panelRender(); }
   }
   panel.append(head, statusBox, btns, btns2, sleepNote, cWoot.r, cGrab.r, grabNote, cStar.r, cJoin.r, cAfk.r, afkMsg, rBlock, blockBtn, msg,
     ...section("theme", "Room theme", rTheme, themeNote),
+    ...section("page", "Customize page", rWp, wpNote, ...tgtRows.map((x) => x.row), pickNote),
     ...section("rules", "Rules for this room", ...rOv),
     ...section("mod", "Mod assist", modNote, cMod.r, cModWarn.r, cModWelcome.r, modLogBox),
     ...section("session", "This session", sessBox),
@@ -159,7 +216,7 @@ function panelStatus(s) { pStatus = s; if (panelRender) panelRender(); }
     bStar.textContent = live && favs.some((f) => f.k === trackKey(s.title, s.artist)) ? "★" : "☆";
     blockBtn.disabled = !(live && s.artist);
     const slugNow = live && s.slug ? s.slug : "";
-    if (slugNow !== themeSlugShown) { themeSlugShown = slugNow; renderTheme(); renderRules(); }
+    if (slugNow !== themeSlugShown) { themeSlugShown = slugNow; renderTheme(); renderRules(); renderWallpaper(); }
     const mod = live && s.isMod;
     [cMod.i, cModWarn.i, cModWelcome.i].forEach((i) => { i.disabled = !mod; });
     modNote.textContent = !live ? "Join a room to check your role."
@@ -349,6 +406,7 @@ function panelStatus(s) { pStatus = s; if (panelRender) panelRender(); }
     if (ch.djStats) renderStats();
     if (ch.modLog) renderModLog();
     if (Object.keys(ch).some((k) => k in THEME_DEFAULTS)) renderTheme();
+    if (Object.keys(ch).some((k) => k in LOOK_DEFAULTS)) loadLook();
     if (Object.keys(ch).some((k) => k in DEFAULTS)) loadSettings();
   });
 
@@ -358,7 +416,8 @@ function panelStatus(s) { pStatus = s; if (panelRender) panelRender(); }
     panel.classList.toggle("hidden", !s.panelOpen);
     if (s.panelPos) setTimeout(() => place(s.panelPos.left, s.panelPos.bottom), 600);
   });
-  loadSettings(); renderHistory(); renderStats(); renderModLog(); renderStatus();
+  loadSettings(); renderHistory(); renderStats(); renderModLog(); renderStatus(); loadLook();
+  setInterval(renderTargets, 4000); // the page re-renders, so keep the "N found" counts fresh
 
   // Mount after the app has hydrated, and re-attach if the SPA removes it.
   const mount = () => { if (document.body && !host.isConnected) document.body.appendChild(host); };

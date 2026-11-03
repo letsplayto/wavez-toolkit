@@ -19,7 +19,7 @@ function cleanStatus(s) {
     myVote: vote(s.myVote), grabbed: !!s.grabbed, canVote: !!s.canVote,
     isDj: !!s.isDj, queued: !!s.queued, listeners: num(s.listeners), muted: !!s.muted,
     queuePos: num(s.queuePos), etaMs: s.etaMs == null ? null : num(s.etaMs),
-    role: str(s.role, 40), isMod: !!s.isMod, sleep: num(s.sleep), woot: str(s.woot, 60),
+    role: str(s.role, 40), isMod: !!s.isMod, sleep: num(s.sleep), woot: str(s.woot, 60), me: str(s.me, 60),
     grab: ["idle", "ok", "error", "unsupported"].includes(s.grab) ? s.grab : "idle"
   };
 }
@@ -41,6 +41,7 @@ window.addEventListener("message", (e) => {
   if (d.type === "status") {
     const cs = cleanStatus(d.payload);
     if (typeof themeSetRoom === "function") themeSetRoom(cs.inRoom ? cs.slug : "");
+    if (typeof lookSetRoom === "function") lookSetRoom(cs.inRoom ? cs.slug : "", cs.inRoom ? cs.me : "");
     if (typeof panelStatus === "function") panelStatus(cs);
     msg = { type: "status", status: cs };
   }

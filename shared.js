@@ -139,3 +139,83 @@ function parseChangelog(text) {
   });
   return out;
 }
+
+// ---- Wallpapers, chat look and page targets (picked on the page) ----
+const LOOK_DEFAULTS = {
+  pageTargets: {},        // role -> CSS selector the user picked on the page (see TARGET_ROLES)
+  wallpaper: "none",      // id of a built-in or custom wallpaper, or "none"
+  roomWallpapers: {},     // room slug -> wallpaper id, or "off"
+  customWallpapers: [],   // [{id, name, image, dim}]
+  chatFontPct: 100,       // chat message text size, 70-200 (%)
+  chatCompact: false,
+  chatHideAvatars: false,
+  chatHideTimes: false,
+  chatBgOn: false,
+  chatBg: "#141414",
+  chatBgAlpha: 100,       // 0-100
+  chatMentionHighlight: false,
+  chatMentionColor: "#ffd54a",
+  chatMutedWords: [],     // hide messages containing these
+  chatIgnoredUsers: []    // hide messages from these users
+};
+
+const TARGET_ROLES = [
+  { id: "scene",   label: "Room background",   multi: false },
+  { id: "chat",    label: "Chat panel",        multi: false },
+  { id: "message", label: "A chat message",    multi: true },
+  { id: "avatar",  label: "A chat avatar",     multi: true },
+  { id: "time",    label: "A chat timestamp",  multi: true }
+];
+
+// Built-in wallpapers are plain CSS gradients, so they work offline.
+const PRESET_WALLPAPERS = [
+  { id: "aurora",      name: "Aurora",       css: "linear-gradient(135deg,#0b132b 0%,#1c2541 40%,#3a506b 70%,#5bc0be 100%)" },
+  { id: "dusk",        name: "Dusk",         css: "linear-gradient(160deg,#1a1033 0%,#4a1942 45%,#c2455e 80%,#f4a259 100%)" },
+  { id: "deepspace",   name: "Deep space",   css: "radial-gradient(ellipse at 30% 20%,#1b2a49 0%,#0a0f1f 60%,#04060d 100%)" },
+  { id: "forestnight", name: "Forest night", css: "linear-gradient(180deg,#07130e 0%,#0f2a1d 60%,#17432f 100%)" },
+  { id: "paperwall",   name: "Paper",        css: "linear-gradient(180deg,#f6f1e7,#e7dfcd)" }
+];
+
+// A picked selector ends up inside a stylesheet, so it must not be able to close the rule or add new ones.
+function safeSelector(sel) {
+  return typeof sel === "string" && /^[^{};@\n\r\t]{1,300}$/.test(sel) && !sel.includes("/*") && !sel.includes("<");
+}
+function findWallpaper(look, id) {
+  return [...PRESET_WALLPAPERS, ...((look && look.customWallpapers) || [])].find((w) => w.id === id) || null;
+}
+// CSS background-image value for a wallpaper, or "" if it isn't usable.
+function wallpaperValue(w) {
+  if (!w) return "";
+  if (w.css) return w.css;
+  const img = String(w.image || "");
+  if (!/^https:\/\/[^\s"'()\\]+$/.test(img)) return "";
+  const d = Math.min(80, Math.max(0, Number(w.dim) || 0)) / 100;
+  return d ? `linear-gradient(rgba(0,0,0,${d}),rgba(0,0,0,${d})),url("${img}")` : `url("${img}")`;
+}
+function buildLookCss(look, wallpaper) {
+  const T = look.pageTargets || {};
+  const sel = (r) => (safeSelector(T[r]) ? T[r] : "");
+  const hex = (v, d) => (/^#[0-9a-f]{6}$/i.test(v) ? v : d);
+  const rgb = (h) => { const n = parseInt(h.slice(1), 16); return `${n >> 16},${(n >> 8) & 255},${n & 255}`; };
+  const num = (v, lo, hi, d) => { const x = Number(v); return Number.isFinite(x) ? Math.min(hi, Math.max(lo, x)) : d; };
+  let css = "";
+  const wp = wallpaperValue(wallpaper);
+  if (wp) {
+    css += `${sel("scene") || "html,body"}{background-image:${wp}!important;background-size:cover!important;` +
+      "background-position:center!important;background-repeat:no-repeat!important}\n";
+  }
+  if (look.chatBgOn && sel("chat")) {
+    css += `${sel("chat")}{background-color:rgba(${rgb(hex(look.chatBg, "#141414"))},${num(look.chatBgAlpha, 0, 100, 100) / 100})!important}\n`;
+  }
+  const pct = num(look.chatFontPct, 70, 200, 100);
+  if (pct !== 100 && sel("message")) css += `${sel("message")}{font-size:${pct}%!important}\n`;
+  if (look.chatCompact && sel("message")) {
+    css += `${sel("message")}{padding-top:2px!important;padding-bottom:2px!important;margin-top:2px!important;margin-bottom:2px!important;line-height:1.25!important}\n`;
+  }
+  if (look.chatHideAvatars && sel("avatar")) css += `${sel("avatar")}{display:none!important}\n`;
+  if (look.chatHideTimes && sel("time")) css += `${sel("time")}{display:none!important}\n`;
+  const mc = hex(look.chatMentionColor, "#ffd54a");
+  css += `[data-wtk-mention]{box-shadow:inset 3px 0 0 ${mc}!important;background-color:rgba(${rgb(mc)},.14)!important}\n`;
+  css += "[data-wtk-hide]{display:none!important}\n";
+  return css;
+}

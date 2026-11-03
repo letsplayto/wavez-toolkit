@@ -350,6 +350,7 @@
         grab: grabFn() ? grabState : "unsupported",
         sleep: sleepAt ? Math.max(1, Math.ceil((sleepAt - Date.now()) / 60000)) : 0,
         woot: wootWhy,
+        me: String((st.currentUser && (st.currentUser.username || st.currentUser.displayUsername)) || ""),
         queuePos: qi ? qi.pos : 0, etaMs: qi ? qi.eta : null,
         role: String(st.room.viewerRole || (st.currentUser && st.currentUser.roomRole) || ""), isMod: isModNow(st)
       };

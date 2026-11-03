@@ -14,6 +14,7 @@ Wavez Toolkit is designed for listeners, DJs, and room moderators who want more 
 - **Notifications:** get alerts for new tracks, mentions, custom alert words, chosen users, favorites, and queue changes while the tab is hidden, with optional quiet hours. Clicking a notification brings the wavez.fm tab forward.
 - **Away mode:** send a configurable, rate-limited reply to @mentions while you are away.
 - **Mod Assist:** flag watched words (plain or regular expressions), unapproved links, flooding, and matching tracks; keep private notes on users; limit it to chosen rooms; review notifications and export a moderation log as CSV.
+- **Wallpapers and chat settings:** use Pick in the panel's "Customize page" section to select the room background and chat parts, then set wallpapers (gradients or your own https image, per room if you like), text size, compact mode, hidden avatars/timestamps, chat background, @mention highlight, hidden words and ignored users. All local; nothing is sent anywhere.
 - **Room customization:** apply preset or custom themes per room, including colors, optional background images, and extra CSS; switch automatically between day and night themes; import and export themes.
 - **Listening history and DJ stats:** keep a searchable local history of up to 500 tracks, track DJ statistics and a per-session summary, and export history as CSV.
 - **Update log:** Options shows a "What's new" list read from this repository's `CHANGELOG.md`, and says when a newer version is listed.
@@ -67,6 +68,7 @@ Data is kept in the browser's extension storage. The extension does not declare 
 - `background.js` — notifications (quiet hours, click-to-focus), local history, DJ statistics, and moderation-log storage.
 - `popup.html` / `popup.js` / `popup.css` — browser-action popup.
 - `options.html` / `options.js` — full settings interface.
+- `look.js` / `picker.js` — wallpapers, chat settings and the page-part picker.
 - `bridge.js` / `theme.js` — page integration and room-theme behavior.
 - `tests/` — a mock-API test run of `main.js` (`npm test`).
 - `CHANGELOG.md` — what changed in each version.

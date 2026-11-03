@@ -158,6 +158,45 @@
   <button id="themeDelete">Delete theme</button>
   <button id="themeClearRooms">Clear per-room choices</button>
 
+  <h2>Wallpaper and chat</h2>
+  <p><small>Wallpapers and most chat settings need the matching parts of the page picked first: on wavez.fm open the in-page panel, expand "Customize page" and press Pick next to each part. You can also type selectors by hand at the bottom of this section.</small></p>
+  <h3>Wallpaper</h3>
+  <label>Default wallpaper <select id="wallpaper"></select></label>
+  <label>Custom wallpaper to edit <select id="wpEdit"></select></label>
+  <label>Name <input type="text" id="wpName" maxlength="40"></label>
+  <label>Image <small>An https:// link to an image. Some sites block images from other hosts.</small>
+    <input type="text" id="wpImage" maxlength="500" placeholder="https://..."></label>
+  <label>Dim the image (0-80%) <small>Darkening makes text easier to read.</small>
+    <input type="number" id="wpDim" min="0" max="80"></label>
+  <button id="wpSave">Save wallpaper</button>
+  <button id="wpDelete">Delete wallpaper</button>
+
+  <h3>Chat</h3>
+  <label>Message text size (%) <input type="number" id="chatFontPct" min="70" max="200"></label>
+  <label class="inline"><input type="checkbox" id="chatCompact"> Compact messages (less spacing)</label>
+  <label class="inline"><input type="checkbox" id="chatHideAvatars"> Hide avatars</label>
+  <label class="inline"><input type="checkbox" id="chatHideTimes"> Hide timestamps</label>
+  <label class="inline"><input type="checkbox" id="chatBgOn"> Custom chat background</label>
+  <div class="colors">
+    <label>Colour <input type="color" id="chatBg"></label>
+    <label>Opacity (%) <input type="number" id="chatBgAlpha" min="0" max="100"></label>
+  </div>
+  <label class="inline"><input type="checkbox" id="chatMentionHighlight"> Highlight messages that @mention me</label>
+  <label>Highlight colour <input type="color" id="chatMentionColor"></label>
+  <label>Hide messages containing<small>One word or phrase per line.</small>
+    <textarea id="chatMutedWords" style="height:60px"></textarea></label>
+  <label>Hide messages from these users<small>One username per line. Matches the name at the start of a message.</small>
+    <textarea id="chatIgnoredUsers" style="height:60px"></textarea></label>
+
+  <h3>Page parts (advanced)</h3>
+  <p><small>Normally filled in with Pick in the in-page panel. You can type a CSS selector here instead (no braces, semicolons or line breaks). If the site updates and a part stops being found, pick it again.</small></p>
+  <label>Room background <input type="text" id="tgt_scene" maxlength="300"></label>
+  <label>Chat panel <input type="text" id="tgt_chat" maxlength="300"></label>
+  <label>A chat message (should match every message) <input type="text" id="tgt_message" maxlength="300"></label>
+  <label>A chat avatar <input type="text" id="tgt_avatar" maxlength="300"></label>
+  <label>A chat timestamp <input type="text" id="tgt_time" maxlength="300"></label>
+  <button id="tgtClear">Clear all picked parts</button>
+
   <h2>Audio and controls</h2>
   <label>Fade-in at each new track (seconds, 0 = off)<small>Ramps the volume up from near-silent. Moving the volume yourself cancels it.</small>
     <input type="number" id="fadeInSec" min="0" max="30"></label>

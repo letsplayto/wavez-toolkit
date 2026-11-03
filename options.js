@@ -1,11 +1,14 @@
 const $ = (id) => document.getElementById(id);
-const checks = ["fetchUpdateLog", "autoStar", "autoGrab", "notifyFavorite", "quietEnabled", "autoWoot", "autoJoin", "notifyTrack", "notifyMention", "notifyUpNext", "afkEnabled", "hotkeys",
+const checks = ["chatCompact", "chatHideAvatars", "chatHideTimes", "chatBgOn", "chatMentionHighlight", "fetchUpdateLog", "autoStar", "autoGrab", "notifyFavorite", "quietEnabled", "autoWoot", "autoJoin", "notifyTrack", "notifyMention", "notifyUpNext", "afkEnabled", "hotkeys",
   "tabTitle", "modEnabled", "modWatch", "modLinks", "modFlood", "modTracks", "modAutoWarn", "modWelcome"];
 const rawLists = ["modNotes"]; // kept as typed (not lowercased)
-const nums = { voteAfterSec: 600, fadeInSec: 30, grabMinWoots: 9999, starMinWoots: 9999, crowdWoots: 9999, upNextSpots: 20 };
+const nums = { voteAfterSec: 600, fadeInSec: 30, grabMinWoots: 9999, starMinWoots: 9999, crowdWoots: 9999, upNextSpots: 20, chatFontPct: 200, chatBgAlpha: 100 };
+const NUM_MIN = { upNextSpots: 1, chatFontPct: 70 };
+const COLOR_KEYS = ["chatBg", "chatMentionColor"];
+const ALLD = { ...DEFAULTS, ...LOOK_DEFAULTS };
 const HK = { woot: "hkWoot", meh: "hkMeh", mute: "hkMute", queue: "hkQueue", grab: "hkGrab", star: "hkStar", panel: "hkPanel" };
-const lists = ["wootDjs", "alertUsers", "modOnlyRooms", "blocklist", "alertWords", "modRoles", "modWords", "modAllowedDomains", "modTrackWords"];
-const texts = ["starMode", "grabMode", "quietFrom", "quietTo", "blockAction", "afkMessage", "panelTheme", "wootScope", "modWarnMessage", "modWelcomeMessage"];
+const lists = ["chatMutedWords", "chatIgnoredUsers", "wootDjs", "alertUsers", "modOnlyRooms", "blocklist", "alertWords", "modRoles", "modWords", "modAllowedDomains", "modTrackWords"];
+const texts = ["chatBg", "chatMentionColor", "starMode", "grabMode", "quietFrom", "quietTo", "blockAction", "afkMessage", "panelTheme", "wootScope", "modWarnMessage", "modWelcomeMessage"];
 const allKeys = [...checks, ...Object.keys(nums), ...texts, ...lists, ...rawLists];
 const say = (t) => { $("status").textContent = t; };
 
@@ -15,9 +18,10 @@ const lines = (k) => $(k).value.split("\n").map((l) => l.trim()).filter(Boolean)
 
 function readKey(k) {
   if (checks.includes(k)) return $(k).checked;
-  if (k in nums) return Math.min(nums[k], Math.max(k === "upNextSpots" ? 1 : 0, Number($(k).value) || 0));
+  if (k in nums) return Math.min(nums[k], Math.max(NUM_MIN[k] || 0, Number($(k).value) || 0));
   if (texts.includes(k)) {
     const v = $(k).value.slice(0, 200);
+    if (COLOR_KEYS.includes(k)) return /^#[0-9a-f]{6}$/i.test(v) ? v : LOOK_DEFAULTS[k];
     return (k === "quietFrom" || k === "quietTo") && !/^\d{2}:\d{2}$/.test(v) ? DEFAULTS[k] : v;
   }
   if (rawLists.includes(k)) return lines(k).map((l) => l.slice(0, 200));
@@ -46,12 +50,12 @@ function fillHotkeys(s) {
     if (document.activeElement !== $(id)) $(id).value = (s.hotkeyKeys && s.hotkeyKeys[cmd]) || DEFAULTS.hotkeyKeys[cmd];
   });
 }
-browser.storage.local.get(DEFAULTS).then((s) => { allKeys.forEach((k) => fillKey(k, s)); fillHotkeys(s); });
+browser.storage.local.get(ALLD).then((s) => { allKeys.forEach((k) => fillKey(k, s)); fillHotkeys(s); });
 // Keep the form in step with changes made elsewhere (the in-page panel, the popup, a restore).
 browser.storage.onChanged.addListener((ch, area) => {
-  const keys = area === "local" ? Object.keys(ch).filter((k) => k in DEFAULTS) : [];
+  const keys = area === "local" ? Object.keys(ch).filter((k) => k in ALLD) : [];
   if (!keys.length) return;
-  browser.storage.local.get(DEFAULTS).then((s) => {
+  browser.storage.local.get(ALLD).then((s) => {
     keys.forEach((k) => { if (allKeys.includes(k)) fillKey(k, s); });
     if (keys.includes("hotkeyKeys")) fillHotkeys(s);
   });
@@ -269,7 +273,7 @@ const ENUMS = {
   blockAction: ["off", "meh", "mute"], panelTheme: ["dark", "light", "auto"], themeSchedule: ["off", "time", "system"]
 };
 function cleanSettings(data) {
-  const defs = { ...DEFAULTS, ...THEME_DEFAULTS }, out = {};
+  const defs = { ...DEFAULTS, ...THEME_DEFAULTS, ...LOOK_DEFAULTS }, out = {};
   for (const [k, def] of Object.entries(defs)) {
     if (!(k in data)) continue;
     let v = data[k];
@@ -294,6 +298,16 @@ function cleanSettings(data) {
         if (Object.keys(c).length) r[slug.slice(0, 80)] = c;
       });
       v = r;
+    } else if (k === "customWallpapers") {
+      v = v.map((w) => cleanWallpaper(w)).filter(Boolean).slice(0, 50);
+    } else if (k === "pageTargets") {
+      const t = {};
+      TARGET_ROLES.forEach((r) => { if (safeSelector(v[r.id])) t[r.id] = v[r.id]; });
+      v = t;
+    } else if (k === "roomWallpapers") {
+      const r = {};
+      Object.entries(v).slice(0, 500).forEach(([slug, id]) => { if (typeof id === "string") r[slug.slice(0, 80)] = id.slice(0, 40); });
+      v = r;
     } else if (k === "roomThemes") {
       const r = {};
       Object.entries(v).slice(0, 500).forEach(([slug, id]) => { if (typeof id === "string") r[slug.slice(0, 80)] = id.slice(0, 40); });
@@ -304,7 +318,7 @@ function cleanSettings(data) {
   return out;
 }
 $("backupExport").addEventListener("click", async () => {
-  const data = await browser.storage.local.get({ ...DEFAULTS, ...THEME_DEFAULTS });
+  const data = await browser.storage.local.get({ ...DEFAULTS, ...THEME_DEFAULTS, ...LOOK_DEFAULTS });
   download("wavez-toolkit-settings.json", { type: "wavez-toolkit-backup", version: 1, data });
   say("Settings exported.");
 });
@@ -452,9 +466,9 @@ $("testNotify").addEventListener("click", () => {
   say("Test notification sent. If you don't see it, check Firefox's and your system's notification settings.");
 });
 $("resetSettings").addEventListener("click", async () => {
-  if (!confirm("Reset all settings to their defaults? Your starred tracks, track history and custom themes are kept.")) return;
-  const d = { ...DEFAULTS, ...THEME_DEFAULTS };
-  delete d.favorites; delete d.customThemes;
+  if (!confirm("Reset all settings to their defaults? Your starred tracks, track history, custom themes and wallpapers, and picked page parts are kept.")) return;
+  const d = { ...DEFAULTS, ...THEME_DEFAULTS, ...LOOK_DEFAULTS };
+  delete d.favorites; delete d.customThemes; delete d.customWallpapers; delete d.pageTargets;
   await browser.storage.local.set(d);
   say("Settings reset to defaults.");
 });
@@ -512,3 +526,72 @@ async function wnLoad(force) {
 }
 $("wnRefresh").addEventListener("click", () => wnLoad(true));
 wnLoad(false);
+
+// ---- Wallpapers (auto-saved) ----
+function cleanWallpaper(w) {
+  if (!w || typeof w !== "object") return null;
+  const image = String(w.image || "").trim();
+  if (!IMG.test(image)) return null;
+  return {
+    id: String(w.id || "").replace(/[^\w-]/g, "").slice(0, 24) || "w" + Date.now().toString(36),
+    name: String(w.name || "Wallpaper").slice(0, 40), image,
+    dim: Math.min(80, Math.max(0, Number(w.dim) || 0))
+  };
+}
+async function wpInit(editId) {
+  const s = await browser.storage.local.get(LOOK_DEFAULTS);
+  const wp = $("wallpaper"), ed = $("wpEdit");
+  wp.textContent = ""; ed.textContent = "";
+  addOpt(wp, "none", "None");
+  [...PRESET_WALLPAPERS, ...s.customWallpapers].forEach((w) => addOpt(wp, w.id, w.name));
+  wp.value = s.wallpaper === "none" || findWallpaper(s, s.wallpaper) ? s.wallpaper : "none";
+  addOpt(ed, "", "New wallpaper...");
+  s.customWallpapers.forEach((w) => addOpt(ed, w.id, w.name));
+  ed.value = s.customWallpapers.some((w) => w.id === editId) ? editId : "";
+  const cur = s.customWallpapers.find((w) => w.id === ed.value);
+  $("wpName").value = cur ? cur.name : ""; $("wpImage").value = cur ? cur.image : ""; $("wpDim").value = cur ? cur.dim : 30;
+}
+$("wallpaper").addEventListener("change", () => browser.storage.local.set({ wallpaper: $("wallpaper").value }));
+$("wpEdit").addEventListener("change", () => wpInit($("wpEdit").value));
+$("wpSave").addEventListener("click", async () => {
+  const w = cleanWallpaper({ id: $("wpEdit").value, name: $("wpName").value.trim() || "My wallpaper", image: $("wpImage").value, dim: $("wpDim").value });
+  if (!w) return say("The image must be a plain https:// link.");
+  const s = await browser.storage.local.get(LOOK_DEFAULTS);
+  const i = s.customWallpapers.findIndex((x) => x.id === w.id);
+  if (i >= 0) s.customWallpapers[i] = w; else s.customWallpapers.push(w);
+  await browser.storage.local.set({ customWallpapers: s.customWallpapers });
+  await wpInit(w.id);
+  say(`Saved wallpaper "${w.name}".`);
+});
+$("wpDelete").addEventListener("click", async () => {
+  const id = $("wpEdit").value;
+  if (!id) return say("Pick one of your custom wallpapers to delete.");
+  const s = await browser.storage.local.get(LOOK_DEFAULTS);
+  Object.keys(s.roomWallpapers).forEach((k) => { if (s.roomWallpapers[k] === id) delete s.roomWallpapers[k]; });
+  await browser.storage.local.set({
+    customWallpapers: s.customWallpapers.filter((w) => w.id !== id), roomWallpapers: s.roomWallpapers,
+    wallpaper: s.wallpaper === id ? "none" : s.wallpaper
+  });
+  await wpInit("");
+  say("Wallpaper deleted.");
+});
+wpInit("");
+
+// ---- Picked page parts (selectors) ----
+const TGT_IDS = TARGET_ROLES.map((r) => r.id);
+function fillTargets(s) {
+  TGT_IDS.forEach((id) => { const e = $("tgt_" + id); if (document.activeElement !== e) e.value = (s.pageTargets || {})[id] || ""; });
+}
+browser.storage.local.get(LOOK_DEFAULTS).then(fillTargets);
+browser.storage.onChanged.addListener((ch, area) => {
+  if (area === "local" && ch.pageTargets) browser.storage.local.get(LOOK_DEFAULTS).then(fillTargets);
+});
+TGT_IDS.forEach((id) => $("tgt_" + id).addEventListener("change", async () => {
+  const v = $("tgt_" + id).value.trim();
+  if (v && !safeSelector(v)) return say("That selector isn't allowed (no braces, semicolons, @ or line breaks).");
+  const { pageTargets } = await browser.storage.local.get({ pageTargets: {} });
+  if (v) pageTargets[id] = v; else delete pageTargets[id];
+  await browser.storage.local.set({ pageTargets });
+  say("Saved.");
+}));
+$("tgtClear").addEventListener("click", async () => { await browser.storage.local.set({ pageTargets: {} }); say("Picked page parts cleared."); });
