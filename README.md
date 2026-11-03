@@ -36,7 +36,7 @@ The extension manifest targets Firefox and declares Firefox-specific settings, i
 
 ## About auto-grab
 
-The WavezFM extension API has no documented grab action. Wavez Toolkit uses one only if the API exposes it (`grab`, `grabTrack`, or `grabCurrent`). If none exists, the in-page panel says so and nothing is clicked on the page. **Options → Diagnostics** shows exactly which actions the site's API offers.
+The [official WavezFM Extension API](https://github.com/WavezFM/WavezFM-Extension-API) has no grab action: it lists only `vote`, `joinQueue`, `leaveQueue`, `sendChat`, and `setVolume`. Auto-grab therefore does nothing on the current API version. The option is kept in case a future version adds one (`grab`, `grabTrack`, or `grabCurrent` are used if they appear), and the in-page panel says so when it can't run. Nothing is ever clicked on the page. **Options → Diagnostics** shows which actions the site's API offers.
 
 **Auto-star** is the always-available alternative. It saves tracks to a starred list kept inside the add-on (not on your WavezFM account), which you can search, export as CSV, or copy as a text list. It keeps your newest 500 starred tracks.
 

@@ -178,6 +178,33 @@ const lastStatus = (r) => { const s = r.posted.filter((m) => m.type === "status"
   ok("async API failure appears in diagnostics errors", dg3 && dg3.payload.errors.some((e) => e.msg === "network down"));
   ok("error entries carry only strings and numbers", dg3.payload.errors.every((e) => typeof e.action === "string" && typeof e.msg === "string" && typeof e.n === "number"));
 
+  // "why" line and refused votes
+  const why = (r) => (lastStatus(r) || {}).woot;
+  r = await run({ state: base(), settings: S({ autoWoot: true }) });
+  r.win.WavezFM.actions.vote = (t) => { r.state.votes.clientVote = t; return { ok: true, code: "ok", requestId: "x" }; };
+  r.state.playback.playbackKey = "k5"; r.state.playback.trackId = "t5"; r.state.votes = { ...r.state.votes, trackId: "t5", clientVote: null }; r.tick(); r.tick();
+  ok("status says 'Wooted' once the vote lands", why(r) === "Wooted");
+  r = await run({ state: base(), settings: S({ autoWoot: false }) });
+  ok("no auto-woot line when auto-woot is off", why(r) === "");
+  const noVote = base(); noVote.votes.canVote = false;
+  r = await run({ state: noVote, settings: S({ autoWoot: true }) });
+  ok("explains when the site says voting isn't available", /isn't available/.test(why(r)));
+  const djOwn = base(); djOwn.queue.isCurrentDj = true;
+  r = await run({ state: djOwn, settings: S({ autoWoot: true }) });
+  ok("explains when you're the DJ", /DJ/.test(why(r)));
+  r = await run({ state: base(), settings: S({ autoWoot: true, voteAfterSec: 60 }) });
+  ok("explains the delay", /delay/.test(why(r)));
+  r = await run({ state: base(), settings: S({ autoWoot: true, crowdWoots: 9 }) });
+  ok("explains waiting for woots", /9 woots/.test(why(r)));
+  r = await run({ state: base(), settings: S({ autoWoot: true }) });
+  r.win.WavezFM.actions.vote = () => ({ ok: false, code: "unavailable", requestId: null });
+  r.state.playback.playbackKey = "k9"; r.state.playback.trackId = "t9"; r.state.votes.trackId = "t9"; r.tick();
+  await new Promise((res) => setTimeout(res, 2300));
+  const dg4 = r.posted.filter((m) => m.type === "diag").pop();
+  ok("a refused vote ({ok:false}) is recorded in diagnostics", dg4 && dg4.payload.errors.some((e) => e.action === "actions.vote" && /refused: unavailable/.test(e.msg)));
+  r.tick();
+  ok("status shows the refusal reason", /refused \(unavailable\)/.test(why(r)));
+
   console.log(fails ? `\n${fails} FAILED` : "\nall passed");
   process.exit(fails ? 1 : 0);
 })();

@@ -18,11 +18,20 @@
     else { errLog.push({ ts: Date.now(), action: label, msg, n: 1 }); if (errLog.length > 20) errLog.shift(); }
     if (!diagTimer) diagTimer = setTimeout(() => { diagTimer = null; sendDiag(); }, 2000);
   }
+  // The API reports refusals as a result object ({ ok: false, code }) rather than by throwing.
+  let voteNote = "";
+  function noteResult(label, r) {
+    if (r && typeof r === "object" && "ok" in r) {
+      if (label === "actions.vote") voteNote = r.ok ? "Vote sent" : `Vote refused (${String(r.code || "unknown").slice(0, 30)})`;
+      if (r.ok === false) noteErr(label, "refused: " + String(r.code || "unknown"));
+    }
+  }
   const call = (fn) => {
     const label = (/api\.(\w+\.\w+)/.exec(String(fn)) || [])[1] || "call";
     try {
       const r = fn();
-      if (r && typeof r.then === "function") r.catch((e) => noteErr(label, e));
+      if (r && typeof r.then === "function") r.then((x) => noteResult(label, x), (e) => noteErr(label, e));
+      else noteResult(label, r);
       return r;
     } catch (e) { noteErr(label, e); return null; }
   };
@@ -43,6 +52,7 @@
   let wasNext = false;
   let manualMuteFrom = null;
   let sleepAt = 0, sleepBase = 0;
+  let wootWhy = "";
   let titleBackup = null;
   let chatKeys = [], diagState = false;
   let fade = null;
@@ -307,6 +317,7 @@
     const base = hadFade ? hadFade.target : st.volume;
     stopFade();
     cur = newCur(pb.playbackKey);
+    voteNote = "";
     if (hadFade && !((Number(S.fadeInSec) || 0) > 0)) call(() => api.actions.setVolume(base));
     if (!(isBlocked(pb) && S.blockAction === "mute") && manualMuteFrom == null) startFade(base);
     if (modActive(st) && S.modTracks) {
@@ -338,6 +349,7 @@
         listeners: st.room.activeUsersCount, muted: !!muted,
         grab: grabFn() ? grabState : "unsupported",
         sleep: sleepAt ? Math.max(1, Math.ceil((sleepAt - Date.now()) / 60000)) : 0,
+        woot: wootWhy,
         queuePos: qi ? qi.pos : 0, etaMs: qi ? qi.eta : null,
         role: String(st.room.viewerRole || (st.currentUser && st.currentUser.roomRole) || ""), isMod: isModNow(st)
       };
@@ -379,6 +391,21 @@
     }
 
     const vip = (S.wootDjs || []).map(lc).includes(lc(pb.djUsername));
+    // Plain-language reason shown in the panel, so it's clear why auto-woot is or isn't voting.
+    const crowdNeed = Number(S.crowdWoots) || 0;
+    const scopeFollow = S.wootScope === "following", scopeStar = S.wootScope === "starred";
+    if (!(opt("autoWoot", st) || vip)) wootWhy = "";
+    else if (v.clientVote) wootWhy = v.clientVote === "woot" ? "Wooted" : "You voted meh, leaving it";
+    else if (st.queue.isCurrentDj) wootWhy = "You're the DJ";
+    else if (v.trackId !== pb.trackId) wootWhy = "Waiting for votes to load";
+    else if (!v.canVote) wootWhy = "The site says voting isn't available";
+    else if (v.clientVotePending) wootWhy = "Vote pending";
+    else if (blocked) wootWhy = "Track is on your blocklist";
+    else if (Date.now() - cur.seenAt < (Number(S.voteAfterSec) || 0) * 1000) wootWhy = "Waiting for your delay";
+    else if (!vip && v.woots < crowdNeed) wootWhy = `Waiting for ${crowdNeed} woots`;
+    else if (!vip && scopeFollow && !(st.social && st.social.isFollowingCurrentDj)) wootWhy = "Not a DJ you follow";
+    else if (!vip && scopeStar && !isFav(pb)) wootWhy = "Not a starred track";
+    else wootWhy = voteNote || "Sending vote";
     const canAct = v.trackId === pb.trackId && v.canVote && !st.queue.isCurrentDj && !v.clientVotePending;
     const waited = Date.now() - cur.seenAt >= (Number(S.voteAfterSec) || 0) * 1000;
     if (canAct && waited && !v.clientVote) {

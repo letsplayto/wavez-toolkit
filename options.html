@@ -55,7 +55,7 @@
     <textarea id="blocklist"></textarea></label>
 
   <h2>Grab and favorites</h2>
-  <p><small>Auto-grab only works if the site's official extension API provides a grab action. If it doesn't, the in-page panel will say so and nothing is clicked on the page. Star a track in the panel (or with Alt+Shift+F) to add it to your favorites.</small></p>
+  <p><small>The site's official extension API has no grab action at the moment, so auto-grab can't run (it's kept in case a future API version adds one, and nothing is ever clicked on the page). Auto-star below does the same job inside this add-on. Star a track in the panel (or with Alt+Shift+F) to add it to your favorites.</small></p>
   <label class="inline"><input type="checkbox" id="autoGrab"> Auto-grab tracks</label>
   <label>Which tracks to grab
     <select id="grabMode"><option value="all">Every track</option><option value="voted">Only tracks I woot</option><option value="starred">Only tracks I've starred</option><option value="minwoots">Tracks with enough woots</option></select></label>

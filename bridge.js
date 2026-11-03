@@ -19,7 +19,7 @@ function cleanStatus(s) {
     myVote: vote(s.myVote), grabbed: !!s.grabbed, canVote: !!s.canVote,
     isDj: !!s.isDj, queued: !!s.queued, listeners: num(s.listeners), muted: !!s.muted,
     queuePos: num(s.queuePos), etaMs: s.etaMs == null ? null : num(s.etaMs),
-    role: str(s.role, 40), isMod: !!s.isMod, sleep: num(s.sleep),
+    role: str(s.role, 40), isMod: !!s.isMod, sleep: num(s.sleep), woot: str(s.woot, 60),
     grab: ["idle", "ok", "error", "unsupported"].includes(s.grab) ? s.grab : "idle"
   };
 }

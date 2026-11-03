@@ -182,6 +182,7 @@ function panelStatus(s) { pStatus = s; if (panelRender) panelRender(); }
     else if (s.queued) notes.push("In queue");
     if (s.muted) notes.push("Muted");
     if (notes.length) statusBox.append(el("div", notes.join(" · "), "muted"));
+    if (s.woot) statusBox.append(el("div", "Auto-woot: " + s.woot, "muted"));
     if (s.title) {
       const k = trackKey(s.title, s.artist);
       const prev = histCache.filter((t) => trackKey(t.title, t.artist) === k);
