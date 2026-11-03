@@ -11,6 +11,9 @@
   textarea { height: 120px; font-family: monospace; }
   button { margin-top: 16px; margin-right: 8px; padding: 6px 14px; }
   h3 { margin: 18px 0 0; font-size: 13px; }
+  details.wn { margin-top: 8px; }
+  details.wn summary { font-weight: 600; cursor: pointer; }
+  details.wn ul { margin: 6px 0 0; padding-left: 20px; }
   .colors { display: flex; gap: 16px; }
   .colors label { flex: 1; }
   input[type=color] { display: block; width: 100%; height: 34px; padding: 2px; }
@@ -28,6 +31,13 @@
 <body>
   <h1>Wavez Toolkit</h1>
   <p><small>Changes save automatically as you make them.</small></p>
+
+  <h2>What's new</h2>
+  <p><small id="wnStatus"></small></p>
+  <div id="wnList"></div>
+  <label class="inline"><input type="checkbox" id="fetchUpdateLog"> Load the update log from GitHub when I open this page <small>Fetches one public text file (CHANGELOG.md) from raw.githubusercontent.com. No personal data is sent.</small></label>
+  <button id="wnRefresh">Refresh update log</button>
+  <a href="https://github.com/letsplayto/wavez-toolkit/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">Open on GitHub</a>
 
   <h2>Voting</h2>
   <label class="inline"><input type="checkbox" id="autoWoot"> Auto-woot every track</label>
