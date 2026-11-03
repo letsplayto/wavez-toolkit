@@ -28,6 +28,7 @@ const DEFAULTS = {
   autoStar: false,       // add tracks to your starred list automatically (works with or without grab support)
   starMode: "voted",     // voted (tracks you woot) | minwoots | all
   starMinWoots: 5,       // used by starMode "minwoots"
+  fetchUpdateLog: true,  // load the update log from GitHub when Options opens (one public text file, no personal data)
   notifyFavorite: true,  // notification when a starred track starts (tab hidden only)
   alertUsers: [],        // notify (tab hidden) when these users chat
   quietEnabled: false,   // suppress all notifications during quiet hours
@@ -114,4 +115,27 @@ ${String(t.css || "").slice(0, 5000)}`;
 
 function trackKey(title, artist) {
   return String(title ?? "").trim().toLowerCase() + "|" + String(artist ?? "").trim().toLowerCase();
+}
+
+// ---- Update log helpers. The log is plain text from GitHub and is only ever displayed as text. ----
+function cmpVersion(a, b) {
+  const p = (v) => String(v).split(".").map((n) => parseInt(n, 10) || 0);
+  const x = p(a), y = p(b);
+  for (let i = 0; i < 3; i++) {
+    if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0) ? 1 : -1;
+  }
+  return 0;
+}
+// Reads "## 1.2.3" headings followed by "- item" lines (the CHANGELOG.md format).
+function parseChangelog(text) {
+  const out = [];
+  let cur = null;
+  String(text).slice(0, 200000).split(/\r?\n/).forEach((raw) => {
+    const line = raw.trim();
+    const h = /^##\s+v?(\d+\.\d+\.\d+)\b/.exec(line);
+    if (h) { cur = out.length < 30 ? { version: h[1], items: [] } : null; if (cur) out.push(cur); return; }
+    const li = /^[-*]\s+(.+)/.exec(line);
+    if (cur && li && cur.items.length < 40) cur.items.push(li[1].replace(/[`*_]/g, "").slice(0, 300));
+  });
+  return out;
 }

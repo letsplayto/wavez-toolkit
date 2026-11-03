@@ -16,6 +16,7 @@ Wavez Toolkit is designed for listeners, DJs, and room moderators who want more 
 - **Mod Assist:** flag watched words (plain or regular expressions), unapproved links, flooding, and matching tracks; keep private notes on users; limit it to chosen rooms; review notifications and export a moderation log as CSV.
 - **Room customization:** apply preset or custom themes per room, including colors, optional background images, and extra CSS; switch automatically between day and night themes; import and export themes.
 - **Listening history and DJ stats:** keep a searchable local history of up to 500 tracks, track DJ statistics and a per-session summary, and export history as CSV.
+- **Update log:** Options shows a "What's new" list read from this repository's `CHANGELOG.md`, and says when a newer version is listed.
 - **Panel:** collapsible sections, and a "heard before" note when a track is already in your history.
 - **Backup and diagnostics:** export and restore all settings, and see which actions the site's API offers from the Options page.
 - **Convenient popup:** view the current room and track, toggle common controls, block the current artist, and review recent tracks from the extension popup.
@@ -53,6 +54,8 @@ The extension requests:
 - `notifications` to show desktop alerts. Clicking one brings an open wavez.fm tab to the front.
 - Access to `https://wavez.fm/*` and `https://www.wavez.fm/*` so the toolkit can integrate with WavezFM rooms.
 
+The only network request the extension makes is the optional update log: when you open Options (and the setting is on), it fetches `CHANGELOG.md` from `raw.githubusercontent.com` and shows it as plain text. No settings, history, or other personal data is sent, and you can turn it off in Options. Everything else stays local.
+
 Data is kept in the browser's extension storage. The extension does not declare external data-collection permissions in its Firefox manifest. Custom theme background images are loaded only when you configure an HTTPS image URL.
 
 ## Project structure
@@ -82,6 +85,10 @@ npm run build   # builds an installable zip in dist/
 ```
 
 GitHub Actions runs the tests, lint, and build on every push.
+
+### Update log format
+
+The in-add-on update log is read from `CHANGELOG.md` on the `main` branch. Keep each release as a `## x.y.z` heading followed by `- item` lines, newest first. The tests check that the newest entry matches the version in `manifest.json`.
 
 When testing moderation features, use a room where you have the appropriate role and clearly communicate any automated warning behavior to participants. Review and customize the default settings before enabling automation.
 

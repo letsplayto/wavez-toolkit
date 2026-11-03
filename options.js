@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const checks = ["autoStar", "autoGrab", "notifyFavorite", "quietEnabled", "autoWoot", "autoJoin", "notifyTrack", "notifyMention", "notifyUpNext", "afkEnabled", "hotkeys",
+const checks = ["fetchUpdateLog", "autoStar", "autoGrab", "notifyFavorite", "quietEnabled", "autoWoot", "autoJoin", "notifyTrack", "notifyMention", "notifyUpNext", "afkEnabled", "hotkeys",
   "tabTitle", "modEnabled", "modWatch", "modLinks", "modFlood", "modTracks", "modAutoWarn", "modWelcome"];
 const rawLists = ["modNotes"]; // kept as typed (not lowercased)
 const nums = { voteAfterSec: 600, fadeInSec: 30, grabMinWoots: 9999, starMinWoots: 9999, crowdWoots: 9999, upNextSpots: 20 };
@@ -385,6 +385,8 @@ $("diagBtn").addEventListener("click", async () => {
     `Room functions: ${list(diag.room)}`,
     `State fields: ${list(diag.state)}`,
     `Chat message fields: ${list(diag.chat)}`,
+    `Recent errors: ${(diag.errors || []).length ? "" : "none"}`,
+    ...(diag.errors || []).map((e) => `  ${new Date(e.ts).toLocaleTimeString()}  ${e.action}: ${e.msg}${e.n > 1 ? ` (x${e.n})` : ""}`),
     `API: ${list(diag.api)}`
   ].join("\n");
 });
@@ -456,3 +458,57 @@ $("resetSettings").addEventListener("click", async () => {
   await browser.storage.local.set(d);
   say("Settings reset to defaults.");
 });
+
+// ---- What's new: the update log, read from GitHub ----
+const CHANGELOG_URL = "https://raw.githubusercontent.com/letsplayto/wavez-toolkit/main/CHANGELOG.md";
+const WN_MAX_AGE = 6 * 3600 * 1000;
+
+function wnRender(cache, failed, enabled) {
+  const cur = browser.runtime.getManifest().version;
+  const list = $("wnList"), status = $("wnStatus");
+  list.textContent = "";
+  const parsed = cache ? parseChangelog(cache.text) : [];
+  if (!parsed.length) {
+    status.textContent = failed ? "Couldn't reach GitHub, and there's no saved copy yet. Try Refresh later."
+      : enabled ? "Loading the update log..." : "The update log isn't loaded. Press Refresh to load it from GitHub.";
+    return;
+  }
+  const latest = parsed.map((p) => p.version).sort(cmpVersion).pop();
+  const when = new Date(cache.ts).toLocaleString();
+  status.textContent = `You have version ${cur}. ` +
+    (cmpVersion(latest, cur) > 0 ? `The log on GitHub lists a newer version (${latest}). ` : "You're up to date with the log. ") +
+    (failed ? `Couldn't reach GitHub just now; showing the copy from ${when}.` : `Log loaded ${when}.`);
+  parsed.forEach((p, i) => {
+    const d = document.createElement("details"); d.className = "wn";
+    d.open = i === 0 || p.version === cur;
+    const s = document.createElement("summary");
+    s.textContent = p.version + (p.version === cur ? " (installed)" : "");
+    const ul = document.createElement("ul");
+    p.items.forEach((t) => { const li = document.createElement("li"); li.textContent = t; ul.append(li); });
+    d.append(s, ul);
+    list.append(d);
+  });
+}
+
+async function wnLoad(force) {
+  const { changelogCache, fetchUpdateLog } = await browser.storage.local.get({ changelogCache: null, fetchUpdateLog: DEFAULTS.fetchUpdateLog });
+  let cache = changelogCache && typeof changelogCache.text === "string" ? changelogCache : null;
+  let failed = false;
+  if (force || (fetchUpdateLog && (!cache || Date.now() - cache.ts > WN_MAX_AGE))) {
+    wnRender(cache, false, true);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    try {
+      const r = await fetch(CHANGELOG_URL, { cache: "no-cache", credentials: "omit", referrerPolicy: "no-referrer", signal: ctrl.signal });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const text = (await r.text()).slice(0, 200000);
+      if (!parseChangelog(text).length) throw new Error("unreadable");
+      cache = { ts: Date.now(), text };
+      await browser.storage.local.set({ changelogCache: cache });
+    } catch { failed = true; }
+    clearTimeout(timer);
+  }
+  wnRender(cache, failed, fetchUpdateLog);
+}
+$("wnRefresh").addEventListener("click", () => wnLoad(true));
+wnLoad(false);

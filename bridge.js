@@ -48,7 +48,9 @@ window.addEventListener("message", (e) => {
     const names = (a) => (Array.isArray(a) ? a.filter((x) => typeof x === "string" && /^[\w$]{1,40}$/.test(x)).slice(0, 80) : []);
     const p = d.payload;
     browser.storage.local.set({ diag: { ts: Date.now(), version: str(p.version, 20), api: names(p.api),
-      actions: names(p.actions), room: names(p.room), state: names(p.state), chat: names(p.chat) } }).catch(() => {});
+      actions: names(p.actions), room: names(p.room), state: names(p.state), chat: names(p.chat),
+      errors: (Array.isArray(p.errors) ? p.errors : []).slice(-20).map((e) => ({ ts: num(e && e.ts), action: str(e && e.action, 40),
+        msg: str(e && e.msg, 120), n: num(e && e.n) })) } }).catch(() => {});
     return;
   }
   else if (d.type === "autostar" && d.payload && typeof d.payload === "object") {

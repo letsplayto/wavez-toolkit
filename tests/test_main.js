@@ -163,6 +163,21 @@ const lastStatus = (r) => { const s = r.posted.filter((m) => m.type === "status"
   r = await run({ state: base(), settings: S({ autoStar: false, starMode: "all" }) });
   ok("auto-star off sends nothing", stars(r).length === 0);
 
+  // failed API calls are recorded (and shown in diagnostics) instead of silently dropped
+  r = await run({ state: base(), settings: S({ autoWoot: true }) });
+  r.win.WavezFM.actions.vote = () => { throw new Error("rate limited"); };
+  r.state.playback.playbackKey = "k2"; r.state.playback.trackId = "t2"; r.state.votes.trackId = "t2"; r.tick();
+  await new Promise((res) => setTimeout(res, 2300));
+  const dg2 = r.posted.filter((m) => m.type === "diag").pop();
+  ok("sync API failure appears in diagnostics errors", dg2 && dg2.payload.errors.some((e) => e.action === "actions.vote" && e.msg === "rate limited"));
+  r = await run({ state: base(), settings: S({ autoWoot: true }) });
+  r.win.WavezFM.actions.vote = () => Promise.reject(new Error("network down"));
+  r.state.playback.playbackKey = "k3"; r.state.playback.trackId = "t3"; r.state.votes.trackId = "t3"; r.tick();
+  await new Promise((res) => setTimeout(res, 2300));
+  const dg3 = r.posted.filter((m) => m.type === "diag").pop();
+  ok("async API failure appears in diagnostics errors", dg3 && dg3.payload.errors.some((e) => e.msg === "network down"));
+  ok("error entries carry only strings and numbers", dg3.payload.errors.every((e) => typeof e.action === "string" && typeof e.msg === "string" && typeof e.n === "number"));
+
   console.log(fails ? `\n${fails} FAILED` : "\nall passed");
   process.exit(fails ? 1 : 0);
 })();

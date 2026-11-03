@@ -3,6 +3,8 @@
 ## 0.9.0
 - Auto-star: automatically save tracks (the ones you woot, ones with enough woots, or all) to your starred list inside the add-on. It works whether or not the site's API offers a grab action.
 - Starred tracks manager in Options: search, remove, export as CSV, copy as a text list.
+- "What's new" in Options: shows this update log, read from GitHub (one public text file, nothing about you is sent; can be turned off).
+- Diagnostics now lists recent failed API calls (which action, what error) instead of dropping them silently, to make problems on the live site easy to report.
 - In-page panel sections can be collapsed, and the panel remembers which are open.
 - "Heard before" line in the panel when the current track is already in your history.
 - Top DJs by average woots in the Options history section.
