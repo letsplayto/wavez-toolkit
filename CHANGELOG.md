@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.0
+- Auto-star: automatically save tracks (the ones you woot, ones with enough woots, or all) to your starred list inside the add-on. It works whether or not the site's API offers a grab action.
+- Starred tracks manager in Options: search, remove, export as CSV, copy as a text list.
+
 ## 0.8.0
 - Diagnostics page in Options: shows which actions and fields the site's API offers (names only).
 - Options now save automatically, field by field.

@@ -25,6 +25,9 @@ const DEFAULTS = {
   upNextSpots: 1,        // notify when you're this many spots (or fewer) from the front of the queue
   tabTitle: false,       // show the current track in the browser tab title
   roomOverrides: {},     // room slug -> {autoWoot|autoGrab|autoJoin: "on"|"off"}
+  autoStar: false,       // add tracks to your starred list automatically (works with or without grab support)
+  starMode: "voted",     // voted (tracks you woot) | minwoots | all
+  starMinWoots: 5,       // used by starMode "minwoots"
   notifyFavorite: true,  // notification when a starred track starts (tab hidden only)
   alertUsers: [],        // notify (tab hidden) when these users chat
   quietEnabled: false,   // suppress all notifications during quiet hours

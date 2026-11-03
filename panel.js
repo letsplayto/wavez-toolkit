@@ -81,7 +81,8 @@ function panelStatus(s) { pStatus = s; if (panelRender) panelRender(); }
     const r = el("label", undefined, "row"); r.append(i, document.createTextNode(label));
     return { i, r };
   };
-  const cWoot = check("Auto-woot"), cJoin = check("Auto-join DJ queue"), cAfk = check("AFK auto-reply"), cGrab = check("Auto-grab tracks");
+  const cWoot = check("Auto-woot"), cJoin = check("Auto-join DJ queue"), cAfk = check("AFK auto-reply"), cGrab = check("Auto-grab tracks"), cStar = check("Auto-star tracks");
+  cStar.r.title = "Saves tracks to your starred list inside this add-on. Works even if the site has no grab action.";
   const grabNote = el("div", "", "muted");
   const afkMsg = el("input", undefined, "txt"); afkMsg.type = "text"; afkMsg.placeholder = "AFK message"; afkMsg.maxLength = 200;
   const block = el("select");
@@ -117,7 +118,7 @@ function panelStatus(s) { pStatus = s; if (panelRender) panelRender(); }
     const o = themeSlugShown && hasOwn(roomOv, themeSlugShown) ? roomOv[themeSlugShown] : {};
     Object.keys(ovSel).forEach((k) => { ovSel[k].value = o[k] || ""; ovSel[k].disabled = !themeSlugShown; });
   }
-  panel.append(head, statusBox, btns, btns2, sleepNote, cWoot.r, cGrab.r, grabNote, cJoin.r, cAfk.r, afkMsg, rBlock, blockBtn, msg,
+  panel.append(head, statusBox, btns, btns2, sleepNote, cWoot.r, cGrab.r, grabNote, cStar.r, cJoin.r, cAfk.r, afkMsg, rBlock, blockBtn, msg,
     el("h3", "Room theme"), rTheme, themeNote,
     el("h3", "Rules for this room"), ...rOv,
     el("h3", "Mod assist"), modNote, cMod.r, cModWarn.r, cModWelcome.r, modLogBox,
@@ -227,7 +228,7 @@ function panelStatus(s) { pStatus = s; if (panelRender) panelRender(); }
   async function loadSettings() {
     const s = await browser.storage.local.get(DEFAULTS);
     cWoot.i.checked = !!s.autoWoot; cJoin.i.checked = !!s.autoJoin; cAfk.i.checked = !!s.afkEnabled;
-    cGrab.i.checked = !!s.autoGrab; favs = Array.isArray(s.favorites) ? s.favorites : [];
+    cGrab.i.checked = !!s.autoGrab; cStar.i.checked = !!s.autoStar; favs = Array.isArray(s.favorites) ? s.favorites : [];
     roomOv = s.roomOverrides && typeof s.roomOverrides === "object" ? s.roomOverrides : {}; renderRules();
     cMod.i.checked = !!s.modEnabled; cModWarn.i.checked = !!s.modAutoWarn; cModWelcome.i.checked = !!s.modWelcome;
     if (document.activeElement !== afkMsg) afkMsg.value = s.afkMessage;
@@ -241,6 +242,7 @@ function panelStatus(s) { pStatus = s; if (panelRender) panelRender(); }
   cJoin.i.addEventListener("change", () => save({ autoJoin: cJoin.i.checked }));
   cAfk.i.addEventListener("change", () => save({ afkEnabled: cAfk.i.checked }));
   cGrab.i.addEventListener("change", () => save({ autoGrab: cGrab.i.checked }));
+  cStar.i.addEventListener("change", () => save({ autoStar: cStar.i.checked }));
   async function toggleStar() {
     if (!pStatus || !pStatus.inRoom || !pStatus.title) return;
     const k = trackKey(pStatus.title, pStatus.artist);

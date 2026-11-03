@@ -1,6 +1,6 @@
 {
   "name": "wavez-toolkit",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "description": "Firefox add-on with quality-of-life tools for wavez.fm, built on the official WavezFM Extension API.",
   "scripts": {

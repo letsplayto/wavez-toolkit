@@ -40,6 +40,16 @@ browser.runtime.onMessage.addListener((msg) => {
     });
   }
 
+  if (msg.type === "autostar" && msg.track) {
+    enqueue(async () => {
+      const { favorites } = await browser.storage.local.get({ favorites: [] });
+      const t = msg.track, k = trackKey(t.title, t.artist);
+      if (favorites.some((f) => f.k === k)) return;
+      favorites.unshift({ k, title: t.title, artist: t.artist, source: t.source, ts: Date.now() });
+      await browser.storage.local.set({ favorites: favorites.slice(0, 500) });
+    });
+  }
+
   if (msg.type === "modflag") {
     enqueue(async () => {
       const { modLog } = await browser.storage.local.get({ modLog: [] });

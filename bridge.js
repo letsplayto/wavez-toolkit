@@ -51,6 +51,11 @@ window.addEventListener("message", (e) => {
       actions: names(p.actions), room: names(p.room), state: names(p.state), chat: names(p.chat) } }).catch(() => {});
     return;
   }
+  else if (d.type === "autostar" && d.payload && typeof d.payload === "object") {
+    const t = { title: str(d.payload.title, 200), artist: str(d.payload.artist, 200), source: str(d.payload.source, 20) };
+    if (t.title) browser.runtime.sendMessage({ type: "autostar", track: t }).catch(() => {});
+    return;
+  }
   else if (d.type === "ui") {
     const n = d.payload && d.payload.name;
     try { if (n === "star" || n === "togglePanel") panelUi[n](); } catch {}

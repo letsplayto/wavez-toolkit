@@ -1,11 +1,11 @@
 const $ = (id) => document.getElementById(id);
-const checks = ["autoGrab", "notifyFavorite", "quietEnabled", "autoWoot", "autoJoin", "notifyTrack", "notifyMention", "notifyUpNext", "afkEnabled", "hotkeys",
+const checks = ["autoStar", "autoGrab", "notifyFavorite", "quietEnabled", "autoWoot", "autoJoin", "notifyTrack", "notifyMention", "notifyUpNext", "afkEnabled", "hotkeys",
   "tabTitle", "modEnabled", "modWatch", "modLinks", "modFlood", "modTracks", "modAutoWarn", "modWelcome"];
 const rawLists = ["modNotes"]; // kept as typed (not lowercased)
-const nums = { voteAfterSec: 600, fadeInSec: 30, grabMinWoots: 9999, crowdWoots: 9999, upNextSpots: 20 };
+const nums = { voteAfterSec: 600, fadeInSec: 30, grabMinWoots: 9999, starMinWoots: 9999, crowdWoots: 9999, upNextSpots: 20 };
 const HK = { woot: "hkWoot", meh: "hkMeh", mute: "hkMute", queue: "hkQueue", grab: "hkGrab", star: "hkStar", panel: "hkPanel" };
 const lists = ["wootDjs", "alertUsers", "modOnlyRooms", "blocklist", "alertWords", "modRoles", "modWords", "modAllowedDomains", "modTrackWords"];
-const texts = ["grabMode", "quietFrom", "quietTo", "blockAction", "afkMessage", "panelTheme", "wootScope", "modWarnMessage", "modWelcomeMessage"];
+const texts = ["starMode", "grabMode", "quietFrom", "quietTo", "blockAction", "afkMessage", "panelTheme", "wootScope", "modWarnMessage", "modWelcomeMessage"];
 const allKeys = [...checks, ...Object.keys(nums), ...texts, ...lists, ...rawLists];
 const say = (t) => { $("status").textContent = t; };
 
@@ -265,7 +265,7 @@ $("themeImport").addEventListener("change", async () => {
 
 // ---- Backup / restore ----
 const ENUMS = {
-  grabMode: ["all", "voted", "starred", "minwoots"], wootScope: ["all", "following", "starred"],
+  grabMode: ["all", "voted", "starred", "minwoots"], starMode: ["voted", "minwoots", "all"], wootScope: ["all", "following", "starred"],
   blockAction: ["off", "meh", "mute"], panelTheme: ["dark", "light", "auto"], themeSchedule: ["off", "time", "system"]
 };
 function cleanSettings(data) {
@@ -280,7 +280,7 @@ function cleanSettings(data) {
     else if (k === "customThemes") v = v.map((t) => cleanTheme(t)).filter(Boolean).slice(0, 50);
     else if (k === "favorites") {
       v = v.filter((f) => f && typeof f.title === "string").slice(0, 500)
-        .map((f) => ({ k: trackKey(f.title, f.artist), title: String(f.title).slice(0, 200), artist: String(f.artist || "").slice(0, 200), ts: Number(f.ts) || 0 }));
+        .map((f) => ({ k: trackKey(f.title, f.artist), title: String(f.title).slice(0, 200), artist: String(f.artist || "").slice(0, 200), source: String(f.source || "").slice(0, 20), ts: Number(f.ts) || 0 }));
     } else if (k === "hotkeyKeys") {
       const h = {};
       Object.keys(def).forEach((c) => { h[c] = /^[A-Za-z]$/.test(v[c]) ? v[c].toUpperCase() : def[c]; });
@@ -382,3 +382,55 @@ $("diagBtn").addEventListener("click", async () => {
 $("diagCopy").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText($("diagOut").textContent); say("Copied."); } catch { say("Couldn't copy."); }
 });
+
+// ---- Starred tracks manager ----
+async function renderStars() {
+  const { favorites } = await browser.storage.local.get({ favorites: [] });
+  const q = $("starSearch").value.trim().toLowerCase();
+  $("starCount").textContent = `${favorites.length} starred (the list keeps your newest 500)`;
+  const box = $("starList");
+  box.textContent = "";
+  favorites.filter((f) => !q || `${f.title} ${f.artist}`.toLowerCase().includes(q)).slice(0, 200).forEach((f) => {
+    const r = document.createElement("div"); r.className = "hrow";
+    const txt = document.createElement("div"); txt.className = "t";
+    const a = document.createElement("div"); a.textContent = `${f.title} - ${f.artist}`;
+    const b = document.createElement("small");
+    b.textContent = [f.source, f.ts ? new Date(f.ts).toLocaleDateString() : ""].filter(Boolean).join(" · ");
+    txt.append(a, b);
+    const btn = document.createElement("button");
+    btn.textContent = "Remove";
+    btn.addEventListener("click", async () => {
+      const { favorites: fv } = await browser.storage.local.get({ favorites: [] });
+      await browser.storage.local.set({ favorites: fv.filter((x) => x.k !== f.k) });
+    });
+    r.append(txt, btn);
+    box.append(r);
+  });
+}
+$("starSearch").addEventListener("input", renderStars);
+browser.storage.onChanged.addListener((ch, area) => { if (area === "local" && ch.favorites) renderStars(); });
+$("starExport").addEventListener("click", async () => {
+  const { favorites } = await browser.storage.local.get({ favorites: [] });
+  if (!favorites.length) return say("No starred tracks yet.");
+  const rows = [["title", "artist", "source", "starred_at"]];
+  favorites.forEach((f) => rows.push([f.title, f.artist, f.source || "", f.ts ? new Date(f.ts).toISOString() : ""]));
+  const blob = new Blob([rows.map((r) => r.map(cell).join(",")).join("\r\n")], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "wavez-starred.csv";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  say(`Exported ${favorites.length} starred tracks.`);
+});
+$("starCopy").addEventListener("click", async () => {
+  const { favorites } = await browser.storage.local.get({ favorites: [] });
+  if (!favorites.length) return say("No starred tracks yet.");
+  try { await navigator.clipboard.writeText(favorites.map((f) => `${f.artist} - ${f.title}`).join("\n")); say(`Copied ${favorites.length} tracks.`); }
+  catch { say("Couldn't copy."); }
+});
+$("starClear").addEventListener("click", async () => {
+  if (!confirm("Remove all starred tracks? This can't be undone.")) return;
+  await browser.storage.local.set({ favorites: [] });
+  say("Starred list cleared.");
+});
+renderStars();

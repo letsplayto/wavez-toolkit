@@ -7,7 +7,7 @@ Wavez Toolkit is designed for listeners, DJs, and room moderators who want more 
 ## Highlights
 
 - **Smarter listening:** optionally auto-woot tracks, wait before voting (or wait for a number of woots), limit auto-woots to DJs you follow or tracks you have starred, always woot chosen DJs, fade in each new track, set a sleep timer, and use customizable keyboard shortcuts.
-- **Grab and favorites:** star tracks, get notified when a favorite plays, and auto-grab tracks **if the WavezFM extension API provides a grab action** (see [About auto-grab](#about-auto-grab)).
+- **Grab and favorites:** star tracks (or let Wavez Toolkit auto-star the ones you woot), manage and export your starred list, get notified when a favorite plays, and auto-grab tracks **if the WavezFM extension API provides a grab action** (see [About auto-grab](#about-auto-grab)).
 - **DJ queue tools:** automatically join the DJ queue when enabled and receive a notification when you are a chosen number of spots from the front.
 - **Per-room rules:** override auto-woot, auto-grab, and auto-join for individual rooms from the in-page panel.
 - **Blocklist controls:** match artists, track titles, or DJs and either meh or temporarily mute matching tracks.
@@ -35,6 +35,8 @@ The extension manifest targets Firefox and declares Firefox-specific settings, i
 ## About auto-grab
 
 The WavezFM extension API has no documented grab action. Wavez Toolkit uses one only if the API exposes it (`grab`, `grabTrack`, or `grabCurrent`). If none exists, the in-page panel says so and nothing is clicked on the page. **Options → Diagnostics** shows exactly which actions the site's API offers.
+
+**Auto-star** is the always-available alternative. It saves tracks to a starred list kept inside the add-on (not on your WavezFM account), which you can search, export as CSV, or copy as a text list. It keeps your newest 500 starred tracks.
 
 ## Configuration
 
@@ -84,7 +86,7 @@ When testing moderation features, use a room where you have the appropriate role
 
 ## Status
 
-Version `0.8.0`. This is an independently maintained toolkit for WavezFM and is not presented as an official WavezFM product.
+Version `0.9.0`. This is an independently maintained toolkit for WavezFM and is not presented as an official WavezFM product.
 
 ## License
 

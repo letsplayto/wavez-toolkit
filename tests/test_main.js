@@ -143,6 +143,26 @@ const lastStatus = (r) => { const s = r.posted.filter((m) => m.type === "status"
   ok("diagnostics list API action names", dg && dg.payload.actions.includes("vote") && dg.payload.actions.includes("grab"));
   ok("diagnostics contain no values", dg && Object.values(dg.payload).every((v) => typeof v === "string" || (Array.isArray(v) && v.every((x) => typeof x === "string"))));
 
+  // auto-star (local starred list, no site action needed)
+  const stars = (r) => r.posted.filter((m) => m.type === "autostar");
+  r = await run({ state: base(), settings: S({ autoStar: true, starMode: "voted" }) });
+  ok("auto-star 'voted': nothing before I woot", stars(r).length === 0);
+  r.state.votes.clientVote = "woot"; r.tick(); r.tick();
+  ok("auto-star 'voted': sent once after I woot", stars(r).length === 1 && stars(r)[0].payload.title === "Song");
+  r = await run({ state: base(), settings: S({ autoStar: true, starMode: "minwoots", starMinWoots: 5 }) });
+  ok("auto-star 'minwoots': 3 < 5, nothing", stars(r).length === 0);
+  r.state.votes.woots = 5; r.tick();
+  ok("auto-star 'minwoots': sent at 5", stars(r).length === 1);
+  r = await run({ state: base(), settings: S({ autoStar: true, starMode: "all" }) });
+  ok("auto-star 'all': sent without any vote", stars(r).length === 1);
+  r = await run({ state: base(), settings: S({ autoStar: true, starMode: "all", favorites: [{ k: "song|artist" }] }) });
+  ok("auto-star skips tracks already starred", stars(r).length === 0);
+  const own = base(); own.queue.isCurrentDj = true;
+  r = await run({ state: own, settings: S({ autoStar: true, starMode: "all" }) });
+  ok("auto-star skips my own track", stars(r).length === 0);
+  r = await run({ state: base(), settings: S({ autoStar: false, starMode: "all" }) });
+  ok("auto-star off sends nothing", stars(r).length === 0);
+
   console.log(fails ? `\n${fails} FAILED` : "\nall passed");
   process.exit(fails ? 1 : 0);
 })();

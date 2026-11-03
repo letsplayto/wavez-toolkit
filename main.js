@@ -16,7 +16,7 @@
     } catch { return null; }
   };
 
-  const newCur = (key) => ({ key, seenAt: Date.now(), nextAt: 0, delay: 1000, mutedFrom: null, grabAt: 0, grabDelay: 2000, grabTries: 0 });
+  const newCur = (key) => ({ key, seenAt: Date.now(), nextAt: 0, delay: 1000, mutedFrom: null, grabAt: 0, grabDelay: 2000, grabTries: 0, starSent: false });
   const CMDS = new Set(["woot", "meh", "toggleMute", "joinLeave", "grab", "sleep15", "sleep30", "sleep60", "sleepOff"]);
   const HK_DEFAULT = { woot: "W", meh: "M", mute: "S", queue: "Q", grab: "G", star: "F", panel: "P" };
   const HK_CMD = { woot: "woot", meh: "meh", mute: "toggleMute", queue: "joinLeave", grab: "grab" };
@@ -398,6 +398,16 @@
         joinNext = Date.now() + joinDelay;
         joinDelay = Math.min(joinDelay * 2, 60000);
         call(() => api.actions.joinQueue());
+      }
+    }
+
+    // Auto-star: save the track to the local starred list (the add-on's own list, no site action involved).
+    if (S.autoStar && pb.title && v.trackId === pb.trackId && !cur.starSent && !st.queue.isCurrentDj && !blocked && !isFav(pb)) {
+      const m = S.starMode;
+      const ok = m === "all" || (m === "minwoots" ? v.woots >= (Number(S.starMinWoots) || 0) : v.clientVote === "woot");
+      if (ok) {
+        cur.starSent = true;
+        send("autostar", { title: String(pb.title), artist: String(pb.artist || ""), source: String(pb.source || "") });
       }
     }
 

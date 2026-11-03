@@ -51,6 +51,11 @@
     <select id="grabMode"><option value="all">Every track</option><option value="voted">Only tracks I woot</option><option value="starred">Only tracks I've starred</option><option value="minwoots">Tracks with enough woots</option></select></label>
   <label>Woots needed (for "enough woots")
     <input type="number" id="grabMinWoots" min="0" max="9999"></label>
+  <label class="inline"><input type="checkbox" id="autoStar"> Auto-star tracks <small>Saves them to your starred list inside this add-on. Works whether or not the site offers a grab action.</small></label>
+  <label>Which tracks to star
+    <select id="starMode"><option value="voted">Only tracks I woot</option><option value="minwoots">Tracks with enough woots</option><option value="all">Every track</option></select></label>
+  <label>Woots needed (for "enough woots")
+    <input type="number" id="starMinWoots" min="0" max="9999"></label>
   <label class="inline"><input type="checkbox" id="notifyFavorite"> Notify me when one of my starred tracks starts (tab hidden)</label>
 
   <h2>DJ queue</h2>
@@ -159,6 +164,14 @@
     <select id="panelTheme"><option value="dark">Dark</option><option value="light">Light</option><option value="auto">Match system</option></select></label>
 
   <button id="save">Save everything now</button>
+  <h2>Starred tracks</h2>
+  <div id="starCount" style="color:gray;margin-top:8px"></div>
+  <label>Search<input type="text" id="starSearch" placeholder="title or artist"></label>
+  <div id="starList"></div>
+  <button id="starExport">Export starred (CSV)</button>
+  <button id="starCopy">Copy as text list</button>
+  <button id="starClear">Remove all starred</button>
+
   <h2>Track history</h2>
   <div id="histSummary"></div>
   <label>Search<input type="text" id="histSearch" placeholder="title, artist or DJ"></label>
