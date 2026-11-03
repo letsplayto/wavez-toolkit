@@ -13,6 +13,11 @@ function panelStatus(s) { pStatus = s; if (panelRender) panelRender(); }
     if (cls) n.className = cls;
     return n;
   };
+  const fmtAgo = (ms) => {
+    const m = Math.round(ms / 60000);
+    return m < 60 ? `${Math.max(1, m)} min` : m < 2880 ? `${Math.round(m / 60)} h` : `${Math.round(m / 1440)} days`;
+  };
+  let histCache = [];
   const fmtEta = (ms) => {
     if (ms == null) return "";
     const m = Math.round(ms / 60000);
@@ -39,6 +44,7 @@ function panelStatus(s) { pStatus = s; if (panelRender) panelRender(); }
     .row { display:flex; align-items:center; gap:6px; padding:3px 0; }
     .row select, input.txt { margin-left:auto; background:var(--btn); color:var(--fg); border:1px solid var(--line); border-radius:4px; }
     input.txt { width:100%; margin:2px 0; box-sizing:border-box; padding:3px 6px; }
+    h3.sec { cursor:pointer; user-select:none; }
     h3 { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:10px 0 4px; }
     .track { padding:3px 0; border-bottom:1px solid var(--line); }
     .btns { display:flex; gap:4px; margin:6px 0 2px; }
@@ -118,11 +124,27 @@ function panelStatus(s) { pStatus = s; if (panelRender) panelRender(); }
     const o = themeSlugShown && hasOwn(roomOv, themeSlugShown) ? roomOv[themeSlugShown] : {};
     Object.keys(ovSel).forEach((k) => { ovSel[k].value = o[k] || ""; ovSel[k].disabled = !themeSlugShown; });
   }
+  // Collapsible sections; open/closed state is remembered.
+  const collapsed = {}, sections = [];
+  function section(key, title, ...nodes) {
+    const h = el("h3", undefined, "sec"), body = el("div");
+    body.append(...nodes);
+    const sync = () => {
+      body.classList.toggle("hidden", !!collapsed[key]);
+      h.textContent = (collapsed[key] ? "▸ " : "▾ ") + title;
+    };
+    h.addEventListener("click", () => { collapsed[key] = !collapsed[key]; sync(); save({ panelCollapsed: { ...collapsed } }); });
+    sections.push(sync);
+    sync();
+    return [h, body];
+  }
   panel.append(head, statusBox, btns, btns2, sleepNote, cWoot.r, cGrab.r, grabNote, cStar.r, cJoin.r, cAfk.r, afkMsg, rBlock, blockBtn, msg,
-    el("h3", "Room theme"), rTheme, themeNote,
-    el("h3", "Rules for this room"), ...rOv,
-    el("h3", "Mod assist"), modNote, cMod.r, cModWarn.r, cModWelcome.r, modLogBox,
-    el("h3", "This session"), sessBox, el("h3", "My DJ stats"), statsBox, el("h3", "Recent tracks"), histBox);
+    ...section("theme", "Room theme", rTheme, themeNote),
+    ...section("rules", "Rules for this room", ...rOv),
+    ...section("mod", "Mod assist", modNote, cMod.r, cModWarn.r, cModWelcome.r, modLogBox),
+    ...section("session", "This session", sessBox),
+    ...section("stats", "My DJ stats", statsBox),
+    ...section("recent", "Recent tracks", histBox));
 
   function renderStatus() {
     statusBox.textContent = "";
@@ -160,6 +182,14 @@ function panelStatus(s) { pStatus = s; if (panelRender) panelRender(); }
     else if (s.queued) notes.push("In queue");
     if (s.muted) notes.push("Muted");
     if (notes.length) statusBox.append(el("div", notes.join(" · "), "muted"));
+    if (s.title) {
+      const k = trackKey(s.title, s.artist);
+      const prev = histCache.filter((t) => trackKey(t.title, t.artist) === k);
+      if (prev.length) {
+        const last = Math.max(...prev.map((t) => t.ts || 0));
+        statusBox.append(el("div", `Heard before: ${prev.length}x, last ${fmtAgo(Date.now() - last)} ago`, "muted"));
+      }
+    }
     bQueue.textContent = s.queued || s.isDj ? "Leave" : "Join";
     pill.textContent = `Wavez 👍 ${s.woots}`;
   }
@@ -167,6 +197,7 @@ function panelStatus(s) { pStatus = s; if (panelRender) panelRender(); }
 
   async function renderHistory() {
     const { history } = await browser.storage.local.get({ history: [] });
+    histCache = history; renderStatus();
     histBox.textContent = "";
     const mineNow = history.filter((t) => t.ts >= sessionStart);
     sessBox.textContent = mineNow.length
@@ -320,7 +351,9 @@ function panelStatus(s) { pStatus = s; if (panelRender) panelRender(); }
     if (Object.keys(ch).some((k) => k in DEFAULTS)) loadSettings();
   });
 
-  browser.storage.local.get({ panelOpen: true, panelPos: null }).then((s) => {
+  browser.storage.local.get({ panelOpen: true, panelPos: null, panelCollapsed: {} }).then((s) => {
+    Object.assign(collapsed, s.panelCollapsed && typeof s.panelCollapsed === "object" ? s.panelCollapsed : {});
+    sections.forEach((sync) => sync());
     panel.classList.toggle("hidden", !s.panelOpen);
     if (s.panelPos) setTimeout(() => place(s.panelPos.left, s.panelPos.bottom), 600);
   });

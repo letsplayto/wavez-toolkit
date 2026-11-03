@@ -16,6 +16,7 @@ Wavez Toolkit is designed for listeners, DJs, and room moderators who want more 
 - **Mod Assist:** flag watched words (plain or regular expressions), unapproved links, flooding, and matching tracks; keep private notes on users; limit it to chosen rooms; review notifications and export a moderation log as CSV.
 - **Room customization:** apply preset or custom themes per room, including colors, optional background images, and extra CSS; switch automatically between day and night themes; import and export themes.
 - **Listening history and DJ stats:** keep a searchable local history of up to 500 tracks, track DJ statistics and a per-session summary, and export history as CSV.
+- **Panel:** collapsible sections, and a "heard before" note when a track is already in your history.
 - **Backup and diagnostics:** export and restore all settings, and see which actions the site's API offers from the Options page.
 - **Convenient popup:** view the current room and track, toggle common controls, block the current artist, and review recent tracks from the extension popup.
 

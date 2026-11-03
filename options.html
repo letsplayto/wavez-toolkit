@@ -77,6 +77,8 @@
   <label>Extra chat alert words<small>One per line. Any chat message containing one notifies you.</small>
     <textarea id="alertWords" style="height:70px"></textarea></label>
 
+  <button id="testNotify">Send a test notification</button>
+
   <h2>Away mode</h2>
   <label class="inline"><input type="checkbox" id="afkEnabled"> AFK auto-reply to @mentions</label>
   <label>AFK message<small>Sent with an [AFK] prefix, at most once per person every 5 minutes and once per 30 seconds overall. It never replies to other [AFK] messages.</small>
@@ -174,6 +176,7 @@
 
   <h2>Track history</h2>
   <div id="histSummary"></div>
+  <div id="histInsights" style="color:gray;margin-top:4px"></div>
   <label>Search<input type="text" id="histSearch" placeholder="title, artist or DJ"></label>
   <div id="histList"></div>
 
@@ -194,6 +197,7 @@
   <button id="clear">Clear track history</button>
   <button id="resetStats">Reset my DJ stats</button>
   <button id="clearRoomRules">Clear per-room rules</button>
+  <button id="resetSettings">Reset settings to defaults</button>
   <p id="status" role="status"></p>
   <script src="shared.js"></script>
   <script src="options.js"></script>

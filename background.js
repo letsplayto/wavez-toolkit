@@ -17,6 +17,13 @@ browser.runtime.onMessage.addListener((msg) => {
 
   if (msg.type === "openOptions") browser.runtime.openOptionsPage();
 
+  if (msg.type === "testNotify") {
+    browser.notifications.create({
+      type: "basic", iconUrl: browser.runtime.getURL("icon.png"),
+      title: "Wavez Toolkit", message: "Notifications are working."
+    });
+  }
+
   if (msg.type === "status") {
     browser.storage.session.set({ status: { ...msg.status, updated: Date.now() } });
     browser.action.setBadgeBackgroundColor({ color: "#2e9e5b" });

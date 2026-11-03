@@ -332,6 +332,15 @@ async function renderHist() {
     ? `${history.length} tracks logged · you wooted ${history.filter((t) => t.myVote === "woot").length} · grabbed ${history.filter((t) => t.grabbed).length} · ${favorites.length} starred` +
       (top ? ` · most wooted: ${top.title} (${top.woots})` : "")
     : "Nothing logged yet.";
+  const byDj = new Map();
+  history.forEach((t) => {
+    if (!t.dj) return;
+    const e = byDj.get(t.dj) || { n: 0, w: 0 };
+    e.n++; e.w += t.woots || 0; byDj.set(t.dj, e);
+  });
+  const topDjs = [...byDj].filter(([, e]) => e.n >= 3).map(([d, e]) => [d, e.w / e.n, e.n]).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  $("histInsights").textContent = topDjs.length
+    ? "Top DJs by average woots (3+ tracks): " + topDjs.map(([d, a, n]) => `${d} ${a.toFixed(1)} (${n} tracks)`).join(" · ") : "";
   const box = $("histList");
   box.textContent = "";
   rows.slice(0, 100).forEach((t) => {
@@ -434,3 +443,16 @@ $("starClear").addEventListener("click", async () => {
   say("Starred list cleared.");
 });
 renderStars();
+
+// ---- Test notification and reset ----
+$("testNotify").addEventListener("click", () => {
+  browser.runtime.sendMessage({ type: "testNotify" }).catch(() => {});
+  say("Test notification sent. If you don't see it, check Firefox's and your system's notification settings.");
+});
+$("resetSettings").addEventListener("click", async () => {
+  if (!confirm("Reset all settings to their defaults? Your starred tracks, track history and custom themes are kept.")) return;
+  const d = { ...DEFAULTS, ...THEME_DEFAULTS };
+  delete d.favorites; delete d.customThemes;
+  await browser.storage.local.set(d);
+  say("Settings reset to defaults.");
+});
