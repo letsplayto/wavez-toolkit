@@ -1,0 +1,14 @@
+{
+  "name": "wavez-toolkit",
+  "version": "0.9.0",
+  "private": true,
+  "description": "Firefox add-on with quality-of-life tools for wavez.fm, built on the official WavezFM Extension API.",
+  "scripts": {
+    "test": "node tests/test_main.js main.js",
+    "lint": "web-ext lint --source-dir . --ignore-files \"tests/**\" \"package*.json\" \"*.md\" \"LICENSE\" \".github/**\" \"node_modules/**\" \"dist/**\"",
+    "build": "web-ext build --source-dir . --artifacts-dir dist --overwrite-dest --ignore-files \"tests/**\" \"package*.json\" \"*.md\" \"LICENSE\" \".github/**\" \"node_modules/**\" \"dist/**\""
+  },
+  "devDependencies": {
+    "web-ext": "^8.0.0"
+  }
+}

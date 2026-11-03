@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Wavez Toolkit",
-  "version": "0.6.1",
-  "description": "Auto-woot, queue tools, blocklist, notifications, AFK reply, DJ stats and mod assist for wavez.fm, built on the official WavezFM Extension API.",
+  "version": "0.9.0",
+  "description": "Auto-woot, auto-grab, queue tools, favorites, blocklist, notifications, AFK reply, DJ stats, room themes and mod assist for wavez.fm, built on the official WavezFM Extension API.",
   "browser_specific_settings": {
     "gecko": {
       "id": "wavez-toolkit@example.local",
@@ -56,6 +56,7 @@
   ],
   "background": {
     "scripts": [
+      "shared.js",
       "background.js"
     ]
   },

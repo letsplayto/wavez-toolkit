@@ -16,30 +16,68 @@
   input[type=color] { display: block; width: 100%; height: 34px; padding: 2px; }
   #themePreview { margin-top: 12px; padding: 14px; border-radius: 6px; border: 1px solid rgba(128,128,128,.4); }
   #themePreview span { font-weight: 700; }
+  .keys { display: flex; flex-wrap: wrap; gap: 10px; }
+  .keys label { flex: 0 0 70px; margin-top: 8px; }
+  .keys input { text-transform: uppercase; text-align: center; }
+  input[type=time] { width: 100%; padding: 4px; box-sizing: border-box; }
+  .hrow { padding: 6px 0; border-bottom: 1px solid rgba(128,128,128,.25); display: flex; gap: 8px; align-items: center; }
+  .hrow .t { flex: 1; min-width: 0; }
+  .hrow button { margin: 0; padding: 2px 8px; }
+  #histSummary { color: gray; margin-top: 8px; }
 </style></head>
 <body>
   <h1>Wavez Toolkit</h1>
+  <p><small>Changes save automatically as you make them.</small></p>
 
   <h2>Voting</h2>
   <label class="inline"><input type="checkbox" id="autoWoot"> Auto-woot every track</label>
   <label>Wait before auto-voting (seconds)<small>Lets you hear the track first. 0 votes immediately.</small>
     <input type="number" id="voteAfterSec" min="0" max="600"></label>
   <label>Auto-woot scope
-    <select id="wootScope"><option value="all">Every track</option><option value="following">Only DJs I follow</option></select></label>
+    <select id="wootScope"><option value="all">Every track</option><option value="following">Only DJs I follow</option><option value="starred">Only tracks I've starred</option></select></label>
+  <label>Wait for the crowd (woots)<small>Auto-woot holds off until the track has at least this many woots. 0 votes straight away.</small>
+    <input type="number" id="crowdWoots" min="0" max="9999"></label>
+  <label>Always woot these DJs<small>One username per line. They get a woot even when auto-woot is off (the delay above still applies).</small>
+    <textarea id="wootDjs" style="height:60px"></textarea></label>
   <label>Blocklist action
     <select id="blockAction"><option value="off">Off</option><option value="meh">Meh blocklisted tracks</option><option value="mute">Mute blocklisted tracks (volume restores afterwards)</option></select></label>
   <label>Blocklist<small>One entry per line. Matches anywhere in title or artist. Use <code>dj:username</code> to match a DJ.</small>
     <textarea id="blocklist"></textarea></label>
+
+  <h2>Grab and favorites</h2>
+  <p><small>Auto-grab only works if the site's official extension API provides a grab action. If it doesn't, the in-page panel will say so and nothing is clicked on the page. Star a track in the panel (or with Alt+Shift+F) to add it to your favorites.</small></p>
+  <label class="inline"><input type="checkbox" id="autoGrab"> Auto-grab tracks</label>
+  <label>Which tracks to grab
+    <select id="grabMode"><option value="all">Every track</option><option value="voted">Only tracks I woot</option><option value="starred">Only tracks I've starred</option><option value="minwoots">Tracks with enough woots</option></select></label>
+  <label>Woots needed (for "enough woots")
+    <input type="number" id="grabMinWoots" min="0" max="9999"></label>
+  <label class="inline"><input type="checkbox" id="autoStar"> Auto-star tracks <small>Saves them to your starred list inside this add-on. Works whether or not the site offers a grab action.</small></label>
+  <label>Which tracks to star
+    <select id="starMode"><option value="voted">Only tracks I woot</option><option value="minwoots">Tracks with enough woots</option><option value="all">Every track</option></select></label>
+  <label>Woots needed (for "enough woots")
+    <input type="number" id="starMinWoots" min="0" max="9999"></label>
+  <label class="inline"><input type="checkbox" id="notifyFavorite"> Notify me when one of my starred tracks starts (tab hidden)</label>
 
   <h2>DJ queue</h2>
   <label class="inline"><input type="checkbox" id="autoJoin"> Auto-join the DJ queue <small>Have a track ready. Turn this off if you use the leave hotkey.</small></label>
 
   <h2>Notifications (shown only while the tab is hidden, except "up next")</h2>
   <label class="inline"><input type="checkbox" id="notifyUpNext"> You're next in the DJ queue</label>
+  <label>Queue alert: tell me when I'm this many spots from the front
+    <input type="number" id="upNextSpots" min="1" max="20"></label>
   <label class="inline"><input type="checkbox" id="notifyMention"> Someone @mentions you</label>
   <label class="inline"><input type="checkbox" id="notifyTrack"> Every new track</label>
+  <label>Alert when these users chat<small>One username per line. Only while the tab is hidden.</small>
+    <textarea id="alertUsers" style="height:60px"></textarea></label>
+  <label class="inline"><input type="checkbox" id="quietEnabled"> Quiet hours: no notifications between</label>
+  <div class="colors">
+    <label>From <input type="time" id="quietFrom"></label>
+    <label>To <input type="time" id="quietTo"></label>
+  </div>
   <label>Extra chat alert words<small>One per line. Any chat message containing one notifies you.</small>
     <textarea id="alertWords" style="height:70px"></textarea></label>
+
+  <button id="testNotify">Send a test notification</button>
 
   <h2>Away mode</h2>
   <label class="inline"><input type="checkbox" id="afkEnabled"> AFK auto-reply to @mentions</label>
@@ -52,7 +90,7 @@
   <label>Roles that count as moderator<small>One per line. The panel shows your current role in the room, so copy it here if you moderate but it isn't listed.</small>
     <textarea id="modRoles" style="height:80px"></textarea></label>
   <label class="inline"><input type="checkbox" id="modWatch"> Flag chat containing watched words</label>
-  <label>Watched words<small>One per line, matched anywhere in a message.</small>
+  <label>Watched words<small>One per line, matched anywhere in a message. Start a line with <code>re:</code> for a regular expression (case-insensitive, max 80 characters).</small>
     <textarea id="modWords" style="height:70px"></textarea></label>
   <label class="inline"><input type="checkbox" id="modLinks"> Flag links to unapproved sites</label>
   <label>Allowed domains<small>One per line. Subdomains are allowed too. Only links starting with http(s):// or www. are checked.</small>
@@ -64,6 +102,10 @@
   <label class="inline"><input type="checkbox" id="modAutoWarn"> Post an [auto-mod] chat warning when something is flagged <small>Once per person every 2 minutes, once per 15 seconds overall.</small></label>
   <label>Warning message <small>{user} becomes @name.</small>
     <input type="text" id="modWarnMessage" maxlength="190"></label>
+  <label>Private user notes<small>One per line as <code>username: note</code>. The note is added to that user's flags.</small>
+    <textarea id="modNotes" style="height:70px"></textarea></label>
+  <label>Only run mod assist in these rooms<small>One room slug per line (the part of the room's address). Empty means every room where your role qualifies.</small>
+    <textarea id="modOnlyRooms" style="height:50px"></textarea></label>
   <label class="inline"><input type="checkbox" id="modWelcome"> Welcome new arrivals <small>At most one greeting per 20 seconds; skipped during join bursts.</small></label>
   <label>Welcome message
     <input type="text" id="modWelcomeMessage" maxlength="190"></label>
@@ -75,6 +117,16 @@
   <label class="inline"><input type="checkbox" id="themeEnabled"> Enable themes</label>
   <label>Default theme (used in every room without its own theme)
     <select id="activeTheme"></select></label>
+  <label>Switch automatically
+    <select id="themeSchedule"><option value="off">No, always use the default</option><option value="time">By time of day</option><option value="system">Follow my system's dark/light mode</option></select></label>
+  <div class="colors">
+    <label>Day theme <select id="themeDay"></select></label>
+    <label>Night theme <select id="themeNight"></select></label>
+  </div>
+  <div class="colors">
+    <label>Night starts <input type="time" id="themeNightFrom"></label>
+    <label>Night ends <input type="time" id="themeNightTo"></label>
+  </div>
   <h3>Create or edit a custom theme</h3>
   <label>Theme to edit <select id="themeEdit"></select></label>
   <label>Start from preset <select id="themeBase"></select></label>
@@ -90,21 +142,62 @@
     <textarea id="themeCss" style="height:90px" maxlength="5000" placeholder=".some-class { background: var(--wtk-accent); }"></textarea></label>
   <div id="themePreview">Preview: <span>accent</span> on this background</div>
   <button id="themeSave">Save theme</button>
+  <button id="themeExport">Export theme</button>
+  <button id="themeImportBtn">Import theme</button>
+  <input type="file" id="themeImport" accept=".json,application/json" hidden>
   <button id="themeDelete">Delete theme</button>
   <button id="themeClearRooms">Clear per-room choices</button>
 
   <h2>Audio and controls</h2>
   <label>Fade-in at each new track (seconds, 0 = off)<small>Ramps the volume up from near-silent. Moving the volume yourself cancels it.</small>
     <input type="number" id="fadeInSec" min="0" max="30"></label>
-  <label class="inline"><input type="checkbox" id="hotkeys"> Hotkeys: Alt+Shift+W woot, +M meh, +S mute toggle, +Q join/leave queue</label>
+  <label class="inline"><input type="checkbox" id="tabTitle"> Show the current track in the browser tab title</label>
+  <label class="inline"><input type="checkbox" id="hotkeys"> Enable hotkeys (all use Alt+Shift plus the letter below)</label>
+  <div class="keys">
+    <label>Woot <input type="text" id="hkWoot" maxlength="1"></label>
+    <label>Meh <input type="text" id="hkMeh" maxlength="1"></label>
+    <label>Mute <input type="text" id="hkMute" maxlength="1"></label>
+    <label>Queue <input type="text" id="hkQueue" maxlength="1"></label>
+    <label>Grab <input type="text" id="hkGrab" maxlength="1"></label>
+    <label>Star <input type="text" id="hkStar" maxlength="1"></label>
+    <label>Panel <input type="text" id="hkPanel" maxlength="1"></label>
+  </div>
   <label>Panel theme
     <select id="panelTheme"><option value="dark">Dark</option><option value="light">Light</option><option value="auto">Match system</option></select></label>
 
-  <button id="save">Save</button>
+  <button id="save">Save everything now</button>
+  <h2>Starred tracks</h2>
+  <div id="starCount" style="color:gray;margin-top:8px"></div>
+  <label>Search<input type="text" id="starSearch" placeholder="title or artist"></label>
+  <div id="starList"></div>
+  <button id="starExport">Export starred (CSV)</button>
+  <button id="starCopy">Copy as text list</button>
+  <button id="starClear">Remove all starred</button>
+
+  <h2>Track history</h2>
+  <div id="histSummary"></div>
+  <div id="histInsights" style="color:gray;margin-top:4px"></div>
+  <label>Search<input type="text" id="histSearch" placeholder="title, artist or DJ"></label>
+  <div id="histList"></div>
+
+  <h2>Diagnostics</h2>
+  <p><small>Shows which actions and fields the site's official extension API offers (names only, no personal data). Open wavez.fm and join a room first. Handy when reporting a problem.</small></p>
+  <button id="diagBtn">Show what the site offers</button>
+  <button id="diagCopy">Copy</button>
+  <pre id="diagOut" style="white-space:pre-wrap;word-break:break-word"></pre>
+
+  <h2>Backup</h2>
+  <p><small>Saves all your settings, themes and starred tracks to one file, and restores them on another browser.</small></p>
+  <button id="backupExport">Export settings</button>
+  <button id="backupImportBtn">Import settings</button>
+  <input type="file" id="backupImport" accept=".json,application/json" hidden>
+
   <h2>Data</h2>
   <button id="export">Export track history (CSV)</button>
   <button id="clear">Clear track history</button>
   <button id="resetStats">Reset my DJ stats</button>
+  <button id="clearRoomRules">Clear per-room rules</button>
+  <button id="resetSettings">Reset settings to defaults</button>
   <p id="status" role="status"></p>
   <script src="shared.js"></script>
   <script src="options.js"></script>
