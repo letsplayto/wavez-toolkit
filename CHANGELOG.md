@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.9.0
+- Firefox for Android: the background script no longer depends on desktop-only APIs (notifications, toolbar badge), and the in-page panel fits and drags on phone screens. Notifications and hotkeys are desktop-only.
 - Wallpapers: built-in gradients or your own https image (with optional dimming), as a default or per room.
 - Chat settings: text size, compact mode, hide avatars/timestamps, custom chat background, @mention highlight, hidden words and ignored users.
 - Point-and-click "Pick" tool in the in-page panel (Customize page) to tell the add-on which parts of wavez.fm to style; selectors can also be edited in Options.

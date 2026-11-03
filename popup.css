@@ -1,5 +1,5 @@
 :root { color-scheme: light dark; --muted: #888; --line: rgba(128,128,128,.3); }
-body { width: 340px; margin: 0; padding: 10px 12px; font: 13px system-ui, sans-serif; }
+body { width: 340px; max-width: 100%; margin: 0; padding: 10px 12px; font: 13px system-ui, sans-serif; }
 header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
 .card { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; }
 .row { display: flex; align-items: center; gap: 6px; padding: 3px 0; justify-content: flex-start; }

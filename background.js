@@ -5,7 +5,7 @@ const lastNotify = {};
 function notify(title, message) {
   browser.storage.local.get({ quietEnabled: false, quietFrom: "23:00", quietTo: "07:00" }).then((q) => {
     if (q.quietEnabled && inTimeWindow(q.quietFrom, q.quietTo)) return;
-    browser.notifications.create({
+    if (browser.notifications) browser.notifications.create({
       type: "basic", iconUrl: browser.runtime.getURL("icon.png"), title, message: message || " "
     });
   }).catch(() => {});
@@ -17,7 +17,7 @@ browser.runtime.onMessage.addListener((msg) => {
 
   if (msg.type === "openOptions") browser.runtime.openOptionsPage();
 
-  if (msg.type === "testNotify") {
+  if (msg.type === "testNotify" && browser.notifications) {
     browser.notifications.create({
       type: "basic", iconUrl: browser.runtime.getURL("icon.png"),
       title: "Wavez Toolkit", message: "Notifications are working."
@@ -26,8 +26,10 @@ browser.runtime.onMessage.addListener((msg) => {
 
   if (msg.type === "status") {
     browser.storage.session.set({ status: { ...msg.status, updated: Date.now() } });
-    browser.action.setBadgeBackgroundColor({ color: "#2e9e5b" });
-    browser.action.setBadgeText({ text: msg.status.inRoom ? String(msg.status.woots) : "" });
+    try {
+      browser.action.setBadgeBackgroundColor({ color: "#2e9e5b" });
+      browser.action.setBadgeText({ text: msg.status.inRoom ? String(msg.status.woots) : "" });
+    } catch {} // badges are not available on every platform (e.g. Firefox for Android)
   }
 
   if (msg.type === "track") {
@@ -78,7 +80,7 @@ browser.runtime.onMessage.addListener((msg) => {
   }
 });
 
-browser.notifications.onClicked.addListener(async () => {
+if (browser.notifications && browser.notifications.onClicked) browser.notifications.onClicked.addListener(async () => {
   try {
     const tabs = await browser.tabs.query({ url: ["https://wavez.fm/*", "https://www.wavez.fm/*"] });
     if (!tabs.length) return;
